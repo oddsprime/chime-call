@@ -305,13 +305,13 @@
           <div v-if="state==='caller:rejected'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
             <!-- [Caller] ❌ You canceled the call. -->
              <span>Rejected</span>
-             <call-rejected></call-rejected>
+             <call-rejected handle-text="Call rejected by @jennyben"></call-rejected>
           </div>
 
           <div v-if="state==='caller:declined'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
             <!-- [Caller] 🚫 The other person declined your call. -->
              <span>Declined</span>
-             <call-rejected></call-rejected>
+             <call-rejected handle-text="Call rejected by @jennyben"></call-rejected>
           </div>
 
           <div v-if="state==='caller:terminated'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
@@ -324,20 +324,20 @@
           <!-- 🎥 CALLEE STATES -->
           <div v-if="state==='callee:incomingAudioCall'">
             [Callee] 📞 Incoming audio call — displaying caller’s name, avatar, and call controls.
+            <div  
+                class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
+              <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
+              <incoming-call
+                :show="state === 'callee:incomingVideoCall'"
+                caller-name="SirStrawberry"
+                caller-handle="@sammisjelly187"
+                @accept="onAcceptCall"
+                @decline="onDeclineCall"
+                @options="onShowOptions"
+              />
+            </div>
           </div>
 
-          <div  
-              class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
-            <incoming-call
-              :show="state === 'callee:incomingVideoCall'"
-              caller-name="SirStrawberry"
-              caller-handle="@sammisjelly187"
-              @accept="onAcceptCall"
-              @decline="onDeclineCall"
-              @options="onShowOptions"
-            />
-          </div>
 
           <div v-if="state==='callee:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
             <call-accepted-card
@@ -408,6 +408,7 @@
                 <div
                   class="_w-full flex-1 h-full inset-0 lg:p-0 flex items-center gap-2 mx-auto">
                   <section class="flex-1 flex flex-col gap-2 h-full relative">
+                    <div v-show="ChimeCallSettings.callMicStatus" class="absolute flex justify-center items-center z-1 top-2 right-2"><img class="h-16 w-16" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/mute-microphone.svg"/></div>
 
                     <!-- Main Video Area -->
                     <div class="flex-1 relative rounded-card-xs bg-cover bg-center">

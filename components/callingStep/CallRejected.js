@@ -4,6 +4,9 @@
       if (!app) return;
   
       app.component('call-rejected', {
+        props:{
+          handleText: { type: String, default: '@jennyben did not answer your call...' },
+        },
         template: `
           <div class="w-[32.8rem] h-[32.8rem] flex flex-col bg-black/80 relative" >
       <!-- calling-info-section -->
@@ -18,7 +21,7 @@
         />
 
         <span class="text-sm text-white text-center"
-          >@jennyben did not answer your call...</span
+          >{{ handleText }}</span
         >
       </div>
     </div>

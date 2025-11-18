@@ -2133,7 +2133,10 @@ class chimeHandler {
     const initials = displayName.substring(0, 2).toUpperCase();
 
     indicator.innerHTML = `
-      <div class="flex w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
+      <div class="absolute w-[12.0rem] h-[12.1rem] bg-black/75 z-1 flex justify-center items-center">
+        <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/disableCamera.svg" class="w-16 h-16 top-camera-disabled-icon" alt="Video camera disabled">
+      </div>
+      <div class="flex w-[12.0rem] h-[12.1rem] flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
         <!-- INITIALS fallback -->
         <div 
           class="w-full h-full bg-purple-500 rounded-full flex items-center justify-center 
