@@ -17,7 +17,7 @@
         emits: ['accept', 'decline', 'options'],
         template: `
           <div
-            v-if="show"
+            
             class="w-[30rem] flex flex-col justify-center items-center gap-6 p-4 rounded-[0.9375rem] bg-[#0C111DE5] relative"
           >
             <!-- header -->
@@ -58,7 +58,7 @@
                 <button
                   @click="$emit('accept')"
                   id="btnAccept"
-                  class="flex justify-center items-center gap-1 w-full h-10 bg-[#07F468] px-3 py-2 border border-[#07F468] rounded cursor-pointer"
+                  class="flex justify-center items-center gap-1 w-full h-10 bg-[#07F468] px-3 py-2 rounded cursor-pointer"
                 >
                   <img :src="acceptIcon" alt="accept" class="w-6 h-6" />
                   <span class="text-sm font-semibold text-[#0C111D] uppercase">Accept</span>
@@ -66,7 +66,7 @@
   
                 <button
                   @click="$emit('decline')"
-                  class="flex justify-center items-center gap-1 w-full h-10 bg-[#EE3400] px-3 py-2 border border-[#EE3400] rounded cursor-pointer"
+                  class="flex justify-center items-center gap-1 w-full h-10 bg-[#EE3400] px-3 py-2 rounded cursor-pointer"
                 >
                   <img :src="declineIcon" alt="decline" class="w-6 h-6" />
                   <span class="text-sm font-semibold text-white uppercase">Decline</span>
@@ -74,13 +74,15 @@
               </div>
   
               <!-- Other Options -->
-              <button
+              <div class="flex justify-center items-center w-full">
+                <button
                 @click="$emit('options')"
                 class="flex items-center gap-0.5 text-sm font-medium text-[#98A2B3]"
               >
                 <span>Other Options</span>
                 <img :src="optionsIcon" alt="options" class="w-5 h-5" />
               </button>
+              </div>
             </div>
           </div>
         `,
