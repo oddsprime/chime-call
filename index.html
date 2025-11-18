@@ -324,20 +324,20 @@
           <!-- 🎥 CALLEE STATES -->
           <div v-if="state==='callee:incomingAudioCall'">
             [Callee] 📞 Incoming audio call — displaying caller’s name, avatar, and call controls.
-            <div  
-                class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-              <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
-              <incoming-call
-                :show="state === 'callee:incomingVideoCall'"
-                caller-name="SirStrawberry"
-                caller-handle="@sammisjelly187"
-                @accept="onAcceptCall"
-                @decline="onDeclineCall"
-                @options="onShowOptions"
-              />
-            </div>
           </div>
 
+          <div  v-if="state === 'callee:incomingVideoCall'"
+              class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
+            <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
+            <incoming-call
+              :show="state === 'callee:incomingVideoCall'"
+              caller-name="SirStrawberry"
+              caller-handle="@sammisjelly187"
+              @accept="onAcceptCall"
+              @decline="onDeclineCall"
+              @options="onShowOptions"
+            />
+          </div>
 
           <div v-if="state==='callee:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
             <call-accepted-card
