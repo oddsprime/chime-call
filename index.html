@@ -85,6 +85,7 @@
   <script src="components/callingStep/CallAcceptedCard.js"></script>
   <script src="components/callingStep/CallPermissionCard.js"></script>
   <script src="components/callingStep/CallRejected.js"></script>
+  <script src="components/callingStep/CallAccepetedCardCreator.js"></script>
 
 
   <style>
@@ -340,13 +341,10 @@
           </div>
 
           <div v-if="state==='callee:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <call-accepted-card
+            <creator-call-acepted
               :show="state === 'callee:callAccepted'"
               handle-text="@jennyben Accepted!"
-              @end-call="onEndCall"
-              @toggle-video="onToggleVideo"
-              @toggle-mic="onToggleMic"
-            ></call-accepted-card>
+            ></creator-call-acepted>
           </div>
 
           <!-- <div v-if="state==='callee:waitingForCamMicPermissions'">
@@ -1609,6 +1607,7 @@
           if (typeof registerCallAcceptedCard === 'function') registerCallAcceptedCard(app);
           if (typeof registerCallPermissionCard === 'function') registerCallPermissionCard(app);
           if (typeof registerCallRejected=== 'function') registerCallRejected(app);
+          if (typeof registerAcceptedCreatorCard=== 'function') registerAcceptedCreatorCard(app);
           
 
           // Mount Vue app to #app
