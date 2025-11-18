@@ -436,7 +436,7 @@
                               class="absolute right-0 md:h-full
                                shadow-xl overflow-y-auto
                                w-full md:w-[400px] z-50">
-                            <chat-sidebar :toggle-chat="toggleChat"></chat-sidebar>
+                            <chat-sidebar :toggle-chat="toggleChat" :is-creator="ChimeCallSettings.userType ==='Fan'"></chat-sidebar>
                           </div>
                         </transition>
                     </div>
@@ -1377,6 +1377,7 @@
                 callMicStatus: false,
                 callChatStatus: false, // Chat sidebar visibility state
                 userAvatarUrl: '',
+                userType:'',
               });
 
               window.settings = ChimeCallSettings; 
@@ -1462,6 +1463,8 @@
                 
                 const userType = data.currentUser.isCreator ? 'Creator' : 'Fan';
                 const otherUserType = data.targetUser.isCreator ? 'Creator' : 'Fan';
+
+                ChimeCallSettings.userType = userType;
 
                 const yourDetails = [
                   `User ID: ${data.currentUser.userId}`,
