@@ -85,6 +85,7 @@
   <script src="components/callingStep/CallAcceptedCard.js"></script>
   <script src="components/callingStep/CallPermissionCard.js"></script>
   <script src="components/callingStep/CallRejected.js"></script>
+  <script src="components/callingStep/CallMissed.js"></script>
   <script src="components/callingStep/CallAccepetedCardCreator.js"></script>
 
 
@@ -1607,6 +1608,7 @@
           if (typeof registerCallAcceptedCard === 'function') registerCallAcceptedCard(app);
           if (typeof registerCallPermissionCard === 'function') registerCallPermissionCard(app);
           if (typeof registerCallRejected=== 'function') registerCallRejected(app);
+          if (typeof registerCallMissed=== 'function') registerCallMissed(app);
           if (typeof registerAcceptedCreatorCard=== 'function') registerAcceptedCreatorCard(app);
           
 
