@@ -326,7 +326,7 @@
             [Callee] 📞 Incoming audio call — displaying caller’s name, avatar, and call controls.
           </div>
 
-          <div  
+          <div v-if="state === 'callee:incomingVideoCall'" 
               class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
             <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
             <incoming-call
