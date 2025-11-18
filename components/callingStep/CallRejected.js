@@ -32,7 +32,7 @@
               <img
                 src="https://i.ibb.co.com/zVx0JM7X/block-video-1.webp"
                 alt="block-video-1"
-                class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]"
+                class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
               />
             </div>
 
@@ -43,7 +43,7 @@
               <img
                 src="https://i.ibb.co.com/zVhRMm4s/microphone-off-01.webp"
                 alt="microphone-off-01"
-                class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]"
+                class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
               />
             </div>
 
@@ -54,7 +54,7 @@
               <img
                 src="https://i.ibb.co.com/nshWZFfD/Communication.webp"
                 alt="Communication"
-                class="w-[1.375rem] h-[1.375rem]"
+                class="w-[22px] h-[22px]"
               />
             </div>
           </div>

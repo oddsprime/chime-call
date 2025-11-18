@@ -123,7 +123,7 @@
     .bg-yellow1{
         background: linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0%, rgba(0, 0, 0, 0.10) 100%), linear-gradient(0deg, rgba(255, 205, 41, 0.75) -3.06%, rgba(255, 205, 41, 0.00) 117.35%);
       }
-      
+
 
     /* Reaction animations */
     @keyframes reactionFadeInOut {
@@ -193,7 +193,14 @@
 
       <!-- Center reaction layer for emoji reactions -->
       <!-- <div id="reaction-layer" style="position: fixed; inset: 0; pointer-events: none; z-index: 3000;"></div> -->
-
+      <calling-card
+      :show="state != 'caller:callWaiting'"
+      handle-text="Calling @jennyben"
+      avatar-src="https://i.ibb.co.com/35W4r1KX/Vector-user.webp"
+      @end-call="onEndCall"
+      @toggle-video="onToggleVideo"
+      @toggle-mic="onToggleMic"
+    ></calling-card>
       <div
       class="relative w-full h-screen overflow-hidden"
       :class="{
@@ -261,7 +268,7 @@
               indicator.</span>
               <calling-card
                 :show="state === 'caller:callWaiting'"
-                handle-text="calling @jennyben"
+                handle-text="Calling @jennyben"
                 avatar-src="https://i.ibb.co.com/35W4r1KX/Vector-user.webp"
                 @end-call="onEndCall"
                 @toggle-video="onToggleVideo"

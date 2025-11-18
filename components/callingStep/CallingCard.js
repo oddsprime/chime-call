@@ -42,17 +42,17 @@
               <div class="flex items-center gap-3 py-2">
                 <!-- video-block -->
                 <button @click="$emit('toggle-video')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
-                  <img :src="videoIcon" alt="video" class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]" />
+                  <img :src="videoIcon" alt="video" class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]" />
                 </button>
 
                 <!-- microphone-off -->
                 <button @click="$emit('toggle-mic')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
-                  <img :src="micIcon" alt="mic" class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]" />
+                  <img :src="micIcon" alt="mic" class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]" />
                 </button>
 
                 <!-- cut-call -->
                 <button @click="$emit('end-call')" class="flex justify-center items-center w-12 h-12 bg-[#FF4405] rounded-full cursor-pointer">
-                  <img :src="endCallIcon" alt="end-call" class="w-[1.375rem] h-[1.375rem]" />
+                  <img :src="endCallIcon" alt="end-call" class="w-[22px] h-[22px]" />
                 </button>
               </div>
             </div>

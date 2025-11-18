@@ -50,7 +50,7 @@
                   <img
                     :src="videoIcon"
                     alt="video"
-                    class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]"
+                    class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
                   />
                 </button>
 
@@ -62,7 +62,7 @@
                   <img
                     :src="micIcon"
                     alt="mic"
-                    class="w-[1.375rem] h-[1.375rem] drop-shadow-[0px_0px_4px_0px_#000000]"
+                    class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
                   />
                 </button>
 
@@ -74,7 +74,7 @@
                   <img
                     :src="endCallIcon"
                     alt="end-call"
-                    class="w-[1.375rem] h-[1.375rem]"
+                    class="w-[22px] h-[22px]"
                   />
                 </button>
               </div>
