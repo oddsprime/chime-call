@@ -85,7 +85,7 @@
   <script src="components/callingStep/CallAcceptedCard.js"></script>
   <script src="components/callingStep/CallPermissionCard.js"></script>
   <script src="components/callingStep/CallRejected.js"></script>
-  <script src="components/callingStep/CallAccepetedCardCreator.js"></script>
+  <script src="components/callingStep/CallMissed.js"></script>
 
 
   <style>
@@ -93,6 +93,7 @@
     * {
         scrollbar-width: none;
         -ms-overflow-style: none;  
+        
       }
 
       *::-webkit-scrollbar {
@@ -327,7 +328,7 @@
             [Callee] 📞 Incoming audio call — displaying caller’s name, avatar, and call controls.
           </div>
 
-          <div  v-if="state === 'callee:incomingVideoCall'"
+          <div v-if="state === 'callee:incomingVideoCall'" 
               class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
             <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
             <incoming-call
@@ -1610,7 +1611,7 @@
           if (typeof registerCallAcceptedCard === 'function') registerCallAcceptedCard(app);
           if (typeof registerCallPermissionCard === 'function') registerCallPermissionCard(app);
           if (typeof registerCallRejected=== 'function') registerCallRejected(app);
-          if (typeof registerAcceptedCreatorCard=== 'function') registerAcceptedCreatorCard(app);
+          if (typeof registerCallMissed=== 'function') registerCallMissed(app);
           
 
           // Mount Vue app to #app
