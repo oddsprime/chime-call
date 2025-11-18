@@ -270,7 +270,7 @@
             
           </div>
 
-          <div  class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
+          <div v-if="state==='caller:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
             <span class="absolute top-0 left-0">[Caller] The callee has accepted your call! Preparing your audio or video connection.</span>
             <call-accepted-card
               :show="state === 'caller:callAccepted'"
