@@ -12,6 +12,7 @@ const ChatSidebar = defineComponent({
   },
   props: {
     toggleChat: { type: Function, required: false },
+    isCreator: {type: Boolean, default: false }
   },
   template: `
     <div class="chat-sidebar-wrapper h-full bg-black/10">
@@ -64,7 +65,7 @@ const ChatSidebar = defineComponent({
                   </div>
                 </div>
                 <div>
-                  <div id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
+                  <div  v-if="!isCreator" id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
                     <img class="w-[24px] h-[24px]" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">
                   </div>
 
@@ -98,7 +99,7 @@ const ChatSidebar = defineComponent({
       </aside>
 
       <!-- Gift Panel -->
-      <aside data-sidebar-pannel id="giftPanel" class="backdrop-blur-[25px] backdrop-blur-lg lg:h-full h-auto lg:relative absolute bottom-0 left-0 w-full lg:w-[400px] bg-black/50 lg:rounded-card shadow-control flex-col justify-center items-center" v-show="meeting.activePanel === 'gift'">
+      <aside data-sidebar-pannel id="giftPanel" class="backdrop-blur-[25px] backdrop-blur-lg lg:h-full h-auto absolute bottom-0 left-0 w-full lg:w-[400px] bg-black/50 lg:rounded-card shadow-control flex-col justify-center items-center" v-show="meeting.activePanel === 'gift'">
         <div class="flex flex-col justify-between h-full">
           <!-- Settings Header & Content -->
           <div class="p-4 flex lg:bg-transparent flex-col gap-4 flex-1 w-full">
@@ -130,7 +131,7 @@ const ChatSidebar = defineComponent({
             </div>
           </div>
           <!-- Default Footer: Add Custom Gift -->
-          <div id="giftFooterDefault" class="px-4 py-2 w-full">
+          <div v-if="!isCreator" id="giftFooterDefault" class="px-4 py-2 w-full">
             <div class="btn w-full">
               <button class="flex px-4 py-[10px] flex justify-center items-center rounded-full w-full bg-brand-primary">
                 <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">
