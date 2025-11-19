@@ -78,14 +78,17 @@
   <script src="components/controlPanelbuttons/vueComponenScreenSizeButton.js" defer></script>
   <script src="components/controlPanelbuttons/vueComponentCameraButton.js" defer></script>
   <script src="components/controlPanelbuttons/vueComponentMicButton.js" defer></script>
+  <script src="components/controlPanelbuttons/EndCallButton.js" defer></script>
 
   <!-- Calling Flow Components -->
   <script src="components/callingStep/IncomingCall.js"></script>
   <script src="components/callingStep/CallingCard.js"></script>
   <script src="components/callingStep/CallAcceptedCard.js"></script>
+  <script src="components/callingStep/CallAccepetedCardCreator.js"></script>
   <script src="components/callingStep/CallPermissionCard.js"></script>
   <script src="components/callingStep/CallRejected.js"></script>
   <script src="components/callingStep/CallMissed.js"></script>
+  <script src="components/callingStep/WaitingToJoin.js"></script>
 
 
   <style>
@@ -299,6 +302,7 @@
           </div>
 
           <div v-if="state==='caller:connectedJoined'">
+            <waiting-to-join></waiting-to-join>
             [Caller] Connected and joined - waiting for Callee to join!
               <bottom-controls user-initials="UN" :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
                 :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings"></bottom-controls>
@@ -413,6 +417,8 @@
                       </div>
                       <div v-show="ChimeCallSettings.callMicStatus" class=""><img class="h-16 w-16" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/mute-microphone.svg"/></div>
                     </div>
+
+                    
 
                     <!-- Main Video Area -->
                     <div class="flex-1 relative rounded-card-xs bg-cover bg-center">
@@ -1608,15 +1614,18 @@
           if (typeof registerToggleScreensize === 'function') registerToggleScreensize(app);
           if (typeof registerCameraButton === 'function') registerCameraButton(app);
           if (typeof registerMicrophoneButton === 'function') registerMicrophoneButton(app);
+          if (typeof registerEndCallButton === 'function') registerEndCallButton(app);
 
             // Calling Flow
 
           if (typeof registerIncomingCall === 'function') registerIncomingCall(app);
           if (typeof registerCallingCard === 'function') registerCallingCard(app);
           if (typeof registerCallAcceptedCard === 'function') registerCallAcceptedCard(app);
+          if (typeof registerAcceptedCreatorCard === 'function') registerAcceptedCreatorCard(app);
           if (typeof registerCallPermissionCard === 'function') registerCallPermissionCard(app);
           if (typeof registerCallRejected=== 'function') registerCallRejected(app);
           if (typeof registerCallMissed=== 'function') registerCallMissed(app);
+          if (typeof registerWaitingToJoin=== 'function') registerWaitingToJoin(app);
           
 
           // Mount Vue app to #app
