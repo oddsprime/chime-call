@@ -11,7 +11,7 @@
     template: `
       <div
         data-toggle-screensize
-        class="h-[68px] w-[68px] rounded-full bg-white/10 flex items-center justify-center cursor-pointer"
+        class="h-[68px] w-[68px] rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer"
         role="button"
         aria-label="Toggle fullscreen"
         @click="$emit('toggle')"

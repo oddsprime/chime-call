@@ -94,7 +94,7 @@
         <div class="w-full h-dvh max-h-dvh xl:h-screen relative bg-cover bg-center bg-no-repeat bg-black/50 backdrop-blur-sm bg-[url(assets/bg-girl-image-call.png)]">
           <div class="w-full h-dvh lg:h-full max-h-dvh xl:max-h-full inset-0 bg-black/50 backdrop-blur-lg lg:p-2 flex items-center gap-2 mx-auto">
             <section class="flex-1 flex flex-col gap-2 relative h-dvh lg:h-full max-h-dvh lg:max-h-full">
-              <div class="flex-1 relative rounded-card-xs bg-cover bg-center">
+              <div class="flex-1 relative rounded-card-xs bg-cover bg-center overflow-hidden">
                 <div class="lg:h-full w-full h-screen">
                   <div class="person" data-local-video-sidebar="" hidden="">
                     <p><span class="handle">@local</span> — <span class="name">Local User</span></p>

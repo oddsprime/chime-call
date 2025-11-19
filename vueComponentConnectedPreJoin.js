@@ -11,7 +11,7 @@ const ConnectedPreJoin = defineComponent({
       <div class="w-full h-dvh max-h-dvh xl:h-screen relative bg-cover bg-center bg-no-repeat bg-black/50 backdrop-blur-sm">
         <div class="w-full h-dvh lg:h-full max-h-dvh xl:max-h-full inset-0 bg-black/50 backdrop-blur-lg lg:p-2 flex items-center gap-2 mx-auto">
           <section class="flex-1 flex flex-col gap-2 relative h-dvh xl:h-full max-h-dvh xl:max-h-full">
-            <div class="flex-1 relative rounded-card-xs bg-cover bg-center">
+            <div class="flex-1 relative rounded-card-xs bg-cover bg-center overflow-hidden">
               <div class="lg:h-[88.5vh] w-full h-screen">
                 <!-- Local Video (if not main) -->
                 <div class="person" id="local-video-sidebar" hidden="">

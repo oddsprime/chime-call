@@ -14,6 +14,7 @@
         @toggle="toggleMicrophone"
       />
       <toggle-screensize @toggle="handleToggleFullscreen"></toggle-screensize>
+      <end-call-button></end-call-button>
 
       `
     });
