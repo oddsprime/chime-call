@@ -407,7 +407,12 @@
                 <div
                   class="_w-full flex-1 h-full inset-0 lg:p-0 flex items-center gap-2 mx-auto">
                   <section class="flex-1 flex flex-col gap-2 h-full relative">
-                    <div v-show="ChimeCallSettings.callMicStatus" class="absolute flex justify-center items-center z-1 top-2 right-2"><img class="h-16 w-16" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/mute-microphone.svg"/></div>
+                    <div class="absolute flex justify-center flex-col items-center gap-2 z-1 top-2 right-2">
+                      <div class="flex lg:hidden h-8 w-8 justify-center items-center">
+                        <img class="h-[22px] w-[22px]" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/dots-horizontal.svg"/>
+                      </div>
+                      <div v-show="ChimeCallSettings.callMicStatus" class=""><img class="h-16 w-16" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/mute-microphone.svg"/></div>
+                    </div>
 
                     <!-- Main Video Area -->
                     <div class="flex-1 relative rounded-card-xs bg-cover bg-center">

@@ -11,7 +11,7 @@
       computed: {
         containerClass() {
           const base =
-            'justify-center lg:justify-between lg:p-4 flex md:gap-0 gap-4 left-0 md:rounded-none rounded-full items-center absolute bottom-0 md:bottom-0 sm:mx-0 mx-auto md:px-0 p3';
+            'justify-center lg:justify-between lg:p-4 flex md:gap-0 gap-4 left-0 md:rounded-none rounded-full items-center absolute bottom-0 md:bottom-0  p-[8px]';
           const bg =
             'lg:bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.75)_100%)]';
           const widthClass = this.chimeCallSettings?.callChatStatus
