@@ -69,19 +69,29 @@
             <div class="w-full flex justify-center items-center p-4">
               <div class="flex items-center gap-3 py-2">
                 <!-- video -->
-                <button @click="$emit('toggle')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
-                  <img :src="videoIcon" alt="video" class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]" />
-                </button>
+                <camera-button 
+                  :enabled="callCamStatus" 
+                  @toggle="$emit('toggle')" 
+                  button-size-classes="w-12 h-12"
+                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
+                />
+                
 
                 <!-- mic -->
-                <button @click="$emit('toggle-mic')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
-                  <img :src="micIcon" alt="mic" class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]" />
-                </button>
+                <microphone-button
+                  :enabled="callMicStatus"
+                  @toggle="$emit('toggle-mic')"
+                  button-size-classes="w-12 h-12"
+                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
+                />
 
                 <!-- end-call -->
-                <button @click="$emit('end-call')" class="flex justify-center items-center w-12 h-12 bg-[#FF4405] rounded-full cursor-pointer">
-                  <img :src="endCallIcon" alt="end" class="w-[22px] h-[22px]" />
-                </button>
+                <end-call-button
+                  :icon="endCallIcon"
+                  btn-size="w-12 h-12"
+                  img-size="w-[2.2rem] h-[2.2rem]"
+                  @click="$emit('end-call')"
+                ></end-call-button>
               </div>
             </div>
           </div>

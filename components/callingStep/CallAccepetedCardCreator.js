@@ -12,7 +12,7 @@
         emits: ['accept', 'decline', 'options'],
         template: `
           <div
-            
+          v-if="show"
             class="w-[30rem] flex flex-col justify-center items-center gap-6 p-4 rounded-[0.9375rem] bg-[#0C111DE5] relative"
           >
             <!-- header -->
