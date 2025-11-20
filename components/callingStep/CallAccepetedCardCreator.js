@@ -7,8 +7,6 @@
           show: { type: Boolean, default: false },
           calleName: { type: String, default: 'SirStrawberry' },
           calleHandle: { type: String, default: '@sammisjelly187' },
-          avatarSrc: { type: String, default: 'https://fansocial-user-media.s3-accelerate.amazonaws.com/user-869/images/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg.png' },
-          loaderSrc: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/green-loader-2.svg' },
           heading: { type: String, default: 'Call Accepted!' },
         },
         emits: ['accept', 'decline', 'options'],
@@ -30,16 +28,8 @@
             <!-- user info section -->
             <div class="flex flex-col justify-center items-center gap-2">
               <!-- avatar-container -->
-              <div class="relative w-[14rem] h-[14rem] flex items-center justify-center">
-                    <div class="flex justify-center items-center w-[9.5rem] h-[9.5rem] relative rounded-blob-1 aspect-square relative overflow-hidden">
-                        <img :src="avatarSrc" alt="user" class="w-100 h-100 fit--cover absolute top-0 left-0" />
-                    </div>
-                    <img
-                    :src="loaderSrc"
-                    alt="green-loader"
-                    class="absolute top-[-2rem] left-[-2rem] min-w-[18rem] h-[17.8rem] animate-spinFast"
-                    />
-                </div>
+              <waiting-avatar :show="true"></waiting-avatar>
+
   
               <!-- name & username container -->
               <div class="flex flex-col justify-center items-center gap-1">
