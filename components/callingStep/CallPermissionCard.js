@@ -15,7 +15,44 @@
         camIcon: { type: String, default: 'https://i.ibb.co.com/Kx9RdLBK/camera-01.webp' },
         micPermissionIcon: { type: String, default: 'https://i.ibb.co.com/qF1tJWsZ/microphone-01.webp' }
       },
-      emits: ['cancel', 'settings', 'toggle-video', 'toggle-mic', 'end-call'],
+      emits: ['cancel', 'settings', 'toggle', 'toggle-mic', 'end-call'],
+      components: {
+        'camera-button': window.VueComponents?.CameraButton,
+        'microphone-button': window.VueComponents?.MicrophoneButton,
+      },
+      computed: {
+        callCamStatus() {
+          if (!window.settings) return false;
+          return window.settings.callCamStatus ?? false;
+        },
+        callMicStatus() {
+          if (!window.settings) return false;
+          return window.settings.callMicStatus ?? false;
+        }
+      },
+      watch: {
+        // Watch for changes to callCamStatus and dispatch CamMic orchestration
+        callCamStatus(newVal, oldVal) {
+          if (newVal === oldVal) return;
+          console.log('[CallPermissionCard] Camera status changed:', newVal);
+          
+          if (newVal) {
+            // Camera turned ON - dispatch CamMic orchestration for both with preview
+            console.log('[CallPermissionCard] 🚀 Dispatching CamMic:Orchestrate:Both to get permissions and start preview');
+            window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));
+          } else {
+            // Camera turned OFF - stop streams
+            console.log('[CallPermissionCard] ⛔ Camera turned off - stopping CamMic streams');
+            window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));
+          }
+        },
+        // Watch for changes to callMicStatus
+        callMicStatus(newVal, oldVal) {
+          if (newVal === oldVal) return;
+          console.log('[CallPermissionCard] Microphone status changed:', newVal);
+          // Mic toggling is handled separately if needed
+        }
+      },
       template: `
         <div v-if="show" class="w-[32.8rem] h-[32.8rem] flex flex-col bg-black/80 relative rounded-md overflow-hidden">
           
@@ -43,7 +80,7 @@
             <div class="w-full flex justify-center items-center p-4">
               <div class="flex items-center gap-3 py-2">
                 <!-- video -->
-                <button @click="$emit('toggle-video')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
+                <button @click="$emit('toggle')" class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer">
                   <img :src="videoIcon" alt="video" class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]" />
                 </button>
 
@@ -60,10 +97,8 @@
             </div>
           </div>
 
-          <!-- video-call-section -->
-          <div class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1]">
-            <img :src="videoIcon" alt="block-video" class="w-7 h-7" />
-          </div>
+          <!-- video-preview-section removed: handler now uses the one outside Vue app (index.html) -->
+          <div class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1] border-4" :class="callCamStatus ? 'border-green-500' : 'border-red-500'"></div>
 
           <!-- allow-permission-section -->
           <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-screen h-screen flex flex-col justify-center items-center gap-6 z-[1]">
@@ -99,6 +134,10 @@
               </div>
             </div>
           </div>
+
+          <!-- Hidden device select elements (required by CamMic handler) -->
+          <select data-cam-mic-element="video-select" style="display: none;"></select>
+          <select data-cam-mic-element="audio-select" style="display: none;"></select>
         </div>
       `,
     });

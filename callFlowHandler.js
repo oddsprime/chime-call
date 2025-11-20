@@ -3265,6 +3265,127 @@ static dipatchUI(state, substate = "none", payload = {}) {
     
     console.log('[CallHandler] [Socket] Call ended for this user due to grace period failure - Reason:', reason);
   }
+
+  /**
+   * Modularized Camera/Microphone Permissions Orchestration Flow
+   * 
+   * Handles the complete async flow for requesting cam/mic permissions:
+   * 1. Transitions to waiting state (freezes UI)
+   * 2. Listens for external state changes (call terminated, joined, etc)
+   * 3. Dispatches orchestration event
+   * 4. Returns to appropriate state based on what happened
+   * 
+   * @param {string} callerIdVal - Caller ID
+   * @param {string} calleeIdVal - Callee ID  
+   * @param {string} calleeRole - Role (caller/callee)
+   * @param {string} mediaType - Type of call (video/audio)
+   * @param {string} returnState - State to return to if orchestration succeeds (e.g. "caller:callAccepted", "callee:callAccepted")
+   * @returns {Promise<void>}
+   */
+  static async orchestrateCamMicPermissionsFlow(callerIdVal, calleeIdVal, calleeRole, mediaType = 'video', returnState = 'caller:callAccepted') {
+    console.log('[CallHandler] [CamMicFlow] [Start]', { callerIdVal, calleeIdVal, calleeRole, mediaType, returnState });
+    
+    const isVideoCall = mediaType === 'video';
+    
+    // Step 1: Transition to waiting state (freezes current UI)
+    const waitingState = CallHandler._currentSide === 'callee' ? 'callee:waitingForCamMicPermissions' : 'caller:waitingForCamMicPermissions';
+    console.log('[CallHandler] [CamMicFlow] 📺 Transitioning to', waitingState);
+    CallHandler.dipatchUI(waitingState, 'none', {
+      callerId: callerIdVal,
+      calleeId: calleeIdVal,
+      role: calleeRole,
+    });
+    
+    // Step 2: Setup listener for external state changes while waiting
+    let externalStateChanged = null;
+    const stateChangeListener = (event) => {
+      const newState = event.detail?.state;
+      console.log('[CallHandler] [CamMicFlow] ⚠️ External state change detected:', newState);
+      
+      // Listen for call termination or other state changes
+      if (newState && newState !== waitingState) {
+        externalStateChanged = newState;
+        console.log('[CallHandler] [CamMicFlow] State will be:', externalStateChanged, 'after permissions complete');
+      }
+    };
+    
+    document.addEventListener('chime-ui::state', stateChangeListener);
+    
+    // Step 3: Setup listener for orchestration completion
+    let orchestrationComplete = false;
+    const onOrchestrationComplete = (ev) => {
+      orchestrationComplete = true;
+      const detail = ev.detail || {};
+      console.log('[CallHandler] [CamMicFlow] 🔔 CamMic:Orchestrate:Complete:', detail);
+      
+      // Check permission states
+      const camera = detail.permissions?.camera || 'unknown';
+      const microphone = detail.permissions?.microphone || 'unknown';
+      
+      console.log('[CallHandler] [CamMicFlow] Permissions:', { camera, microphone });
+      
+      // If permissions denied, stay in waiting state
+      if ((isVideoCall && camera === 'denied') || (!isVideoCall && microphone === 'denied')) {
+        console.log('[CallHandler] [CamMicFlow] ❌ Required permission denied');
+        alert('❌ Permission denied. Please enable in browser settings and try again.');
+        return;
+      }
+      
+      // Permissions granted - return to appropriate state
+      const finalState = externalStateChanged || returnState;
+      console.log('[CallHandler] [CamMicFlow] ✅ Permissions granted - returning to:', finalState);
+      CallHandler.dipatchUI(finalState, 'none', {
+        callerId: callerIdVal,
+        calleeId: calleeIdVal,
+        role: calleeRole,
+      });
+    };
+    
+    window.addEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+    
+    try {
+      // Step 4: Dispatch orchestration based on call type
+      if (isVideoCall) {
+        console.log('[CallHandler] [CamMicFlow] 🚀 Dispatching CamMic:Orchestrate:Both:NoPreview (video call)');
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));
+      } else {
+        console.log('[CallHandler] [CamMicFlow] 🚀 Dispatching CamMic:Orchestrate:Microphone (audio call)');
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));
+      }
+      
+      console.log('[CallHandler] [CamMicFlow] ⏳ Waiting for orchestration to complete...');
+      
+      // Wait for orchestration to complete (with timeout)
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Orchestration timeout')), 30000)
+      );
+      const completion = new Promise((resolve) => {
+        const checkComplete = setInterval(() => {
+          if (orchestrationComplete) {
+            clearInterval(checkComplete);
+            resolve();
+          }
+        }, 100);
+      });
+      
+      await Promise.race([completion, timeout]);
+      
+    } catch (error) {
+      console.error('[CallHandler] [CamMicFlow] ❌ Error:', error);
+      // Return to previous state on error
+      const finalState = externalStateChanged || returnState;
+      CallHandler.dipatchUI(finalState, 'none', {
+        callerId: callerIdVal,
+        calleeId: calleeIdVal,
+        role: calleeRole,
+      });
+    } finally {
+      // Cleanup listeners
+      document.removeEventListener('chime-ui::state', stateChangeListener);
+      window.removeEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+      console.log('[CallHandler] [CamMicFlow] 🧹 Listeners cleaned up');
+    }
+  }
 }
 
 // Expose globally if you want to trigger app-level dispatches elsewhere

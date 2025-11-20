@@ -13,7 +13,21 @@
         micIcon: { type: String, default: 'https://i.ibb.co.com/zVhRMm4s/microphone-off-01.webp' },
         endCallIcon: { type: String, default: 'https://i.ibb.co.com/nshWZFfD/Communication.webp' },
       },
-      emits: ['end-call', 'toggle-video', 'toggle-mic'],
+      emits: ['end-call', 'toggle', 'toggle-mic'],
+      components: {
+        'camera-button': window.VueComponents?.CameraButton,
+        'microphone-button': window.VueComponents?.MicrophoneButton,
+      },
+      computed: {
+        callCamStatus() {
+          if (!window.settings) return false;
+          return window.settings.callCamStatus ?? false;
+        },
+        callMicStatus() {
+          if (!window.settings) return false;
+          return window.settings.callMicStatus ?? false;
+        }
+      },
       template: `
         <div
         v-if="show"
@@ -43,28 +57,16 @@
             <div class="w-full flex justify-center items-center p-4">
               <div class="flex items-center gap-3 py-2">
                 <!-- video-block -->
-                <button
-                  @click="$emit('toggle-video')"
-                  class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer"
-                >
-                  <img
-                    :src="videoIcon"
-                    alt="video"
-                    class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
-                  />
-                </button>
+                <camera-button 
+                  :enabled="callCamStatus" 
+                  @toggle="$emit('toggle')" 
+                />
 
                 <!-- microphone-off -->
-                <button
-                  @click="$emit('toggle-mic')"
-                  class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer"
-                >
-                  <img
-                    :src="micIcon"
-                    alt="mic"
-                    class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
-                  />
-                </button>
+                <microphone-button
+                  :enabled="callMicStatus"
+                  @toggle="$emit('toggle-mic')"
+                />
 
                 <!-- cut-call -->
                 <button
@@ -81,15 +83,11 @@
             </div>
           </div>
 
-          <!-- video-call-section -->
-          <div
-            class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1]"
-          >
-            <img
-              :src="videoIcon"
-              alt="block-video"
-              class="w-7 h-7"
-            />
+          <!-- video-call-section with green/red borders (video-preview now in index.html outside Vue) -->
+          <div v-if="callCamStatus" video-on class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1] border-4 border-green-500">
+          </div>
+          <div v-if="!callCamStatus" video-off class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1] border-4 border-red-500">
+            <img :src="videoIcon" alt="preview" class="w-7 h-7" />
           </div>
         </div>
       `,

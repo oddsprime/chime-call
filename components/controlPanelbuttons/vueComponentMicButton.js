@@ -12,7 +12,9 @@
         // Optional direct callback for backward compatibility
         onToggle: { type: Function, required: false },
         // Optional aria label override
-        ariaLabel: { type: String, default: 'Toggle microphone' }
+        ariaLabel: { type: String, default: 'Toggle microphone' },
+        // optional button classes for customization
+        buttonClasses: { type: String, default: '' }
       },
       emits: ['toggle'],
       template: `
@@ -22,7 +24,7 @@
           :aria-pressed="enabled"
           :aria-label="ariaLabel"
           :class="[
-            'h-[68px] w-[68px] w-12 h-12 min-w-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200',
+            buttonClasses || 'h-[68px] w-[68px] w-12 h-12 min-w-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200',
             enabled ? 'bg-white/75' : 'bg-white/5'
           ]"
           @click="handleClick"

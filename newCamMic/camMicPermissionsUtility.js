@@ -1133,8 +1133,11 @@ class CamMicPermissionsUtility {
         deviceId,
       })}`
     );
-    // Query for video preview element
-    const videoElement = document.querySelector(
+    // Find master video element in footer (source of truth)
+    const footer = document.querySelector('footer');
+    const masterVideo = footer ? footer.querySelector('[data-cam-mic-element="video-preview"]') : null;
+    // Fallback: query for any video preview element (backward compatibility)
+    const videoElement = masterVideo || document.querySelector(
       '[data-cam-mic-element="video-preview"]'
     );
     // Check if video element is missing
@@ -1252,9 +1255,13 @@ class CamMicPermissionsUtility {
       );
       // Pause video element to cancel any pending play() calls
       videoElement.pause();
-      // Wait briefly to ensure pending operations are cancelled
-      await new Promise(resolve => setTimeout(resolve, 50));
-      // Set stream as source object for video element
+      // Set stream as source object for master video first (if master video exists and is different)
+      if (masterVideo && masterVideo !== videoElement) {
+        masterVideo.pause();
+        masterVideo.srcObject = stream;
+        await masterVideo.play().catch(() => {});
+      }
+      // Set stream as source object for video element (primary preview, for backward compatibility)
       videoElement.srcObject = stream;
       // Register the stream for tracking
       this._registerStream(stream);
@@ -1332,6 +1339,10 @@ class CamMicPermissionsUtility {
       );
       // Emit preview started event
       CamMicPermissionsUtility.emit("CamMic:Preview:Started", { deviceId });
+      // Trigger sync to all preview elements via handler if available
+      if (window.CamMicPermissionsHandler && typeof window.CamMicPermissionsHandler._syncMultipleVideoPreviews === 'function') {
+        window.CamMicPermissionsHandler._syncMultipleVideoPreviews();
+      }
       // Log completion
       console.log("[CamMicPermissionsUtility] [startCameraPreview] [End] {}");
       // Return true to indicate success

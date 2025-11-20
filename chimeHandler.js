@@ -1083,33 +1083,39 @@ class chimeHandler {
           attendeeInfo: attendeeInfoWrapped,
         });
 
-        // Join the meeting with BOTH audio and video OFF (user must manually turn ON)
+        // Join the meeting with settings from window.settings (user's preference)
         // Use mockCallData mediaType if available, fallback to callType
         const mediaType = window.mockCallData?.mediaType || callType;
+        
+        // Read settings right before joining
+        const enableVideo = window.settings?.callCamStatus ?? false;
+        const enableAudio = window.settings?.callMicStatus ?? false;
+        
         console.log(
-          "[chimeHandler] Joining coreChime with media OFF - mediaType:",
-          mediaType
+          "[chimeHandler] Joining coreChime with settings - mediaType:",
+          mediaType,
+          "video:",
+          enableVideo,
+          "audio:",
+          enableAudio
         );
         
-        // ALWAYS join with media OFF - user must manually turn ON
+        // Join with user's preferred settings
         await coreChime.join({
-          enableAudio: false,
-          enableVideo: false,
+          enableAudio: enableAudio,
+          enableVideo: enableVideo,
         });
 
-        console.log("[chimeHandler] Successfully joined Chime meeting with media OFF");
+        console.log("[chimeHandler] Successfully joined Chime meeting with video:", enableVideo, "audio:", enableAudio);
         
-        // Update UI state to reflect OFF
+        // Update UI state to reflect actual settings
         if (window.vueState && window.vueState.meeting) {
-          window.vueState.meeting.videoFeed = false;
-          window.vueState.meeting.audioFeed = false;
+          window.vueState.meeting.videoFeed = enableVideo;
+          window.vueState.meeting.audioFeed = enableAudio;
         }
-        if (window.settings) {
-          window.settings.callCamStatus = false;
-          window.settings.callMicStatus = false;
-        }
+        // Settings are already set correctly from user's preference, no need to reset
         
-        console.log("[chimeHandler] ✅ Joined with media OFF - user must manually turn ON video/audio");
+        console.log("[chimeHandler] ✅ Joined successfully with user's preferred settings");
       } catch (error) {
         console.error("[chimeHandler] Error joining Chime meeting:", error);
       }
