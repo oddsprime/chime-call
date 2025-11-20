@@ -218,7 +218,14 @@
         'grid-cols-[1fr_0px] md:grid-cols-[1fr_auto]': !ChimeCallSettings.callChatStatus || isMobile
       }">
       <div class="relative w-full h-screen" data-chime-templates>
-        <div data-video-container class="w-full h-full absolute">
+        <div
+          data-video-container
+          class="h-full absolute"
+          :class="{
+            'w-full lg:[width:calc(100%-400px)]': ChimeCallSettings.callChatStatus,
+            'w-full': !ChimeCallSettings.callChatStatus || isMobile
+          }"
+        >
           <div id="reaction-layer" class="absolute w-full h-full inset-0 pointer-events-none z-[3000]"></div>
           <!-- ===============================
           CHIME TILE LAYOUT — INTEGRATED
