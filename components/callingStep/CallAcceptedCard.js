@@ -49,25 +49,25 @@
                 <camera-button 
                   :enabled="callCamStatus" 
                   @toggle="$emit('toggle')" 
+                  button-size-classes="w-12 h-12"
+                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
                 />
 
                 <!-- microphone-off -->
                 <microphone-button
                   :enabled="callMicStatus"
                   @toggle="$emit('toggle-mic')"
+                  button-size-classes="w-12 h-12"
+                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
                 />
 
                 <!-- cut-call -->
-                <button
+                <end-call-button
+                  :icon="endCallIcon"
+                  btn-size="w-12 h-12"
+                  img-size="w-[2.2rem] h-[2.2rem]"
                   @click="$emit('end-call')"
-                  class="flex justify-center items-center w-12 h-12 bg-[#FF4405] rounded-full cursor-pointer"
-                >
-                  <img
-                    :src="endCallIcon"
-                    alt="end-call"
-                    class="w-[22px] h-[22px]"
-                  />
-                </button>
+                ></end-call-button>
               </div>
             </div>
           </div>

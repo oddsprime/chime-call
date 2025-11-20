@@ -29,37 +29,28 @@
         <div class="w-full flex justify-center items-center p-4">
           <div class="flex items-center gap-3 py-2">
             <!-- video-block -->
-            <div
-              class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer"
-            >
-              <img
-                src="https://i.ibb.co.com/zVx0JM7X/block-video-1.webp"
-                alt="block-video-1"
-                class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
-              />
-            </div>
+            <camera-button 
+              :enabled="callCamStatus" 
+              @toggle="$emit('toggle')" 
+              button-size-classes="w-12 h-12"
+              icon-size-classes="w-[2.2rem] h-[2.2rem]"
+            />
 
             <!-- microphone-off -->
-            <div
-              class="flex justify-center items-center w-12 h-12 bg-white/5 rounded-full cursor-pointer"
-            >
-              <img
-                src="https://i.ibb.co.com/zVhRMm4s/microphone-off-01.webp"
-                alt="microphone-off-01"
-                class="w-[22px] h-[22px] drop-shadow-[0px_0px_4px_0px_#000000]"
-              />
-            </div>
+            <microphone-button
+              :enabled="callMicStatus"
+              @toggle="$emit('toggle-mic')"
+              button-size-classes="w-12 h-12"
+              icon-size-classes="w-[2.2rem] h-[2.2rem]"
+            />
 
             <!-- cut-call -->
-            <div
-              class="flex justify-center items-center w-12 h-12 bg-[#FF4405] rounded-full cursor-pointer"
-            >
-              <img
-                src="https://i.ibb.co.com/nshWZFfD/Communication.webp"
-                alt="Communication"
-                class="w-[22px] h-[22px]"
-              />
-            </div>
+            <end-call-button
+              :icon="endCallIcon"
+              btn-size="w-12 h-12"
+              img-size="w-[2.2rem] h-[2.2rem]"
+              @click="$emit('end-call')"
+            ></end-call-button>
           </div>
         </div>
       </div>
