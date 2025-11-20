@@ -19,7 +19,7 @@
         >
           <div class="flex items-center gap-2">
             <img src="assets/settings-02.svg" alt="icon" />
-            <h2 class="text-white lg:text-base text-sm font-medium">Audio &amp; Video Setting</h2>
+            <h2 class="text-white lg:text-base text-sm font-medium">Audio &amp; Video Settings</h2>
           </div>
           <img
             src="assets/chevron-down-white.svg"

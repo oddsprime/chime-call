@@ -14,7 +14,7 @@
       },
       methods: {
         handleOutsideClick(event) {
-          const chatSection = document.getElementById('chat-section');
+          const chatSection = document.getElementById('chat-siderbar');
           if (chatSection && !chatSection.contains(event.target)) {
             if (this.chimeCallSettings?.callChatStatus) {
               this.toggleChat && this.toggleChat();
@@ -28,8 +28,8 @@
                   chimeCallSettings?.callChatStatus ? 'bg-white/75' : 'bg-white/10'
                 ]"
                aria-label="Toggle chat">
-               <img v-if="chimeCallSettings.callChatStatus" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/message-dots-circle-black.svg" class="w-8 h-8 black-chat-icon" alt="Chat">
-               <img v-else src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/chat-icon.svg" class="w-8 h-8" alt="Chat">
+               <img v-show="chimeCallSettings.callChatStatus" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/message-dots-circle-black.svg" class="w-8 h-8 black-chat-icon" alt="Chat">
+               <img v-show="!chimeCallSettings.callChatStatus" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/chat-icon.svg" class="w-8 h-8" alt="Chat">
           </div>
       `
     });

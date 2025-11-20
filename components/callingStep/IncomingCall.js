@@ -16,7 +16,7 @@
         template: `
           <div
           v-if="show"
-            class="w-[30rem] flex flex-col justify-center items-center gap-6 p-4 rounded-[0.9375rem] bg-[#0C111DE5] relative"
+            class="w-full md:w-[30rem] lg:w-[30rem] flex flex-col justify-center items-center gap-6 px-2 py-4 md:px-4 rounded-t-[0.9375rem] md:rounded-[0.9375rem] bg-[#0C111DE5] absolute  md:relative lg:relative bottom-0"
           >
             <!-- header -->
             <div class="flex items-center gap-2">

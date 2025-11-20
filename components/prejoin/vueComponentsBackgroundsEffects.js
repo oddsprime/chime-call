@@ -19,7 +19,7 @@
         >
           <div class="flex items-center gap-2">
             <img src="assets/background-drop-icon.svg" alt="icon" />
-            <span class="text-white text-base font-medium">BACKGROUNDS &amp; EFFECTS</span>
+            <span class="text-white text-base font-medium">Backgrounds &amp; Effects</span>
           </div>
           <img
             src="assets/chevron-down-white.svg"

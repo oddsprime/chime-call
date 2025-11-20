@@ -12,10 +12,15 @@ const ChatSidebar = defineComponent({
   },
   props: {
     toggleChat: { type: Function, required: false },
-    isCreator: {type: Boolean, default: false }
+  },
+  computed: {
+    currentRole() {
+      if (!window.settings) return '';
+      return window.settings.userType || '';
+    },
   },
   template: `
-    <div class="chat-sidebar-wrapper h-full bg-black/10">
+    <div data-chat-siderbar id="chat-siderbar" class="chat-sidebar-wrapper h-full bg-black/10">
       <!-- Chat Panel - Always Visible -->
       <aside data-sidebar-pannel id="chatPanel" class="lg:w-40 h-full sm:h-screen lg:h-full md:h-screen relative overflow-y-auto g-2  shadow-control w-full backdrop-blur-md flex flex-col">
         <div id="chat-section">
@@ -52,7 +57,7 @@ const ChatSidebar = defineComponent({
                     <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/send-03.svg" class="invert"/>
                   </button>
                 </div>
-                <div @click="setActivePanel('gift')">
+                <div v-show="currentRole === 'Creator'" @click="setActivePanel('gift')">
                   <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/gift-02.svg" id="giftToggleBtn" class="w-[24px] h-[24px] cursor-pointer" aria-label="Open gift menu">
                 </div>
 
@@ -65,7 +70,7 @@ const ChatSidebar = defineComponent({
                   </div>
                 </div>
                 <div>
-                  <div  v-if="!isCreator" id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
+                  <div v-show="currentRole === 'Creator'" id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
                     <img class="w-[24px] h-[24px]" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">
                   </div>
 
@@ -131,7 +136,7 @@ const ChatSidebar = defineComponent({
             </div>
           </div>
           <!-- Default Footer: Add Custom Gift -->
-          <div v-if="!isCreator" id="giftFooterDefault" class="px-4 py-2 w-full">
+          <div id="giftFooterDefault" class="px-4 py-2 w-full">
             <div class="btn w-full">
               <button class="flex px-4 py-[10px] flex justify-center items-center rounded-full w-full bg-brand-primary">
                 <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">

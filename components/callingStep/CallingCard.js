@@ -45,7 +45,7 @@
 
         currentRole() {
           if (!window.settings) return '';
-          return window.settings.currentRole || '';
+          return window.settings.userType || '';
         },
 
  

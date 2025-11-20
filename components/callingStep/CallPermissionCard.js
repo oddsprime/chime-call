@@ -52,57 +52,10 @@
         }
       },
       template: `
-        <div v-if="show" class="w-[32.8rem] h-[32.8rem] flex flex-col bg-black/80 relative rounded-md overflow-hidden">
-          
-          <!-- calling-info-section -->
-          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col justify-center items-center gap-4 pointer-events-none">
-                <div class="flex flex-col justify-center items-center gap-2">
-                <!-- avatar-container -->
-                <waiting-avatar :show="true"></waiting-avatar>
-
-                <span class="text-sm text-white text-center">Calling {{ handleText }}...</span>
-            </div>
-          </div>
-
-          <!-- bottom-controls-section -->
-          <div class="w-full h-full flex justify-end items-end flex-grow">
-            <div class="w-full flex justify-center items-center p-4">
-              <div class="flex items-center gap-3 py-2">
-                <!-- video -->
-                <camera-button 
-                  :enabled="callCamStatus" 
-                  @toggle="$emit('toggle')" 
-                  button-size-classes="w-12 h-12"
-                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
-                />
-                
-
-                <!-- mic -->
-                <microphone-button
-                  :enabled="callMicStatus"
-                  @toggle="$emit('toggle-mic')"
-                  button-size-classes="w-12 h-12"
-                  icon-size-classes="w-[2.2rem] h-[2.2rem]"
-                />
-
-                <!-- end-call -->
-                <end-call-button
-                  :icon="endCallIcon"
-                  btn-size="w-12 h-12"
-                  img-size="w-[2.2rem] h-[2.2rem]"
-                  @click="$emit('end-call')"
-                ></end-call-button>
-              </div>
-            </div>
-          </div>
-
-          <!-- video-preview-section removed: handler now uses the one outside Vue app (index.html) -->
-          <div class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1] border-4" :class="callCamStatus ? 'border-green-500' : 'border-red-500'"></div>
-
-          <!-- allow-permission-section -->
-          <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-screen h-screen flex flex-col justify-center items-center gap-6 z-[1]">
-            <div class="flex flex-col gap-4 p-4 w-80 h-[17.3125rem] rounded-[0.625rem] bg-[#0C111D80] backdrop-blur-[50px]">
-              <p class="text-lg font-semibold text-white text-center">
+      <div v-if="show" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-screen h-screen flex flex-col justify-center items-center gap-6 z-[1]">
+      <!-- allow-permission-section -->
+            <div class="flex flex-col gap-4 p-6 w-80 xl:w-auto  rounded-[0.625rem] bg-[#0C111D80] backdrop-blur-[50px]">
+              <p class="text-lg font-semibold text-white text-left xl:text-center">
                 Please allow below permission to start call:
               </p>
 
@@ -134,10 +87,6 @@
             </div>
           </div>
 
-          <!-- Hidden device select elements (required by CamMic handler) -->
-          <select data-cam-mic-element="video-select" style="display: none;"></select>
-          <select data-cam-mic-element="audio-select" style="display: none;"></select>
-        </div>
       `,
     });
   }

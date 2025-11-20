@@ -11,7 +11,7 @@
       template: `
         <div
           data-sidebar-trigger
-          class="bg-white/5 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-full w-12 h-12 min-w-12
+          class="bg-white/5 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-full h-[68px] w-[68px] min-w-12
                  lg:hidden flex items-center justify-center cursor-pointer transition-all duration-200"
           role="button"
           aria-label="Open settings"
