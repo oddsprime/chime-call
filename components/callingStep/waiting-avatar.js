@@ -20,9 +20,7 @@
           '<div v-if="show" class="relative w-[14rem] h-[14rem] flex items-center justify-center">' +
   
             // Avatar wrapper
-            '<div class="flex justify-center items-center w-[9.5rem] h-[9.5rem] relative rounded-blob-1 aspect-square overflow-hidden">' +
-              '<img src="' + AVATAR_SRC + '" alt="avatar" class="w-100 h-100 object-cover absolute top-0 left-0" />' +
-            '</div>' +
+            '<DefaultAvatar size="w-[9.5rem] h-[9.5rem]" />' +
   
             // Loader
             '<img src="' + LOADER_SRC + '" alt="loader" class="absolute top-[-2rem] left-[-2rem] min-w-[18rem] h-[17.8rem] animate-spinFast" />' +

@@ -18,14 +18,7 @@
         data-waiting-text
       >
         <!-- Avatar / Blob -->
-        <div class="flex w-[78px] h-[80px] lg:w-[12rem] lg:h-[12rem] flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden">
-          <div
-            data-user-initial
-            class="w-full h-full bg-purple-500 flex items-center justify-center text-white text-xl font-bold rounded-blob-1 aspect-square relative overflow-hidden"
-          >
-            {{ userInitials }}
-          </div>
-        </div>
+        <DefaultAvatar size="w-[12rem] h-[12rem]" />
 
         <!-- Waiting Message -->
         <span>Waiting for {{ waitingHandle }} to join...</span>
