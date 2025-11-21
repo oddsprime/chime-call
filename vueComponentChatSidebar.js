@@ -20,7 +20,7 @@ const ChatSidebar = defineComponent({
     },
   },
   template: `
-    <div data-chat-siderbar id="chat-siderbar" class="chat-sidebar-wrapper h-full bg-black/50 rounded-[10px] overflow-y-auto lg:w-[40rem]">
+    <div data-chat-siderbar id="chat-siderbar" class="chat-sidebar-wrapper h-full bg-black/50 lg:rounded-[10px] overflow-y-auto lg:w-[40rem]">
       <!-- Chat Panel - Always Visible -->
       <aside data-sidebar-pannel id="chatPanel" class="lg:w-40 h-full sm:h-screen lg:h-full md:h-screen relative overflow-y-auto g-2  shadow-control w-full backdrop-blur-md flex flex-col">
         <div id="chat-section">

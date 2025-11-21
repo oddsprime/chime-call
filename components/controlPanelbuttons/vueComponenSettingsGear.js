@@ -11,7 +11,7 @@
       template: `
         <div
           data-sidebar-trigger
-          class="bg-white/5 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-full h-[68px] w-[68px] min-w-12
+          class="bg-white/5 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-full h-12 w-12 min-w-12
                  lg:hidden flex items-center justify-center cursor-pointer transition-all duration-200"
           role="button"
           aria-label="Open settings"
@@ -19,7 +19,7 @@
         >
           <img
             src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/settings-02.svg"
-            class="w-8 h-8 invert brightness-0"
+            class="w-[2.2rem] h-[2.2rem] invert brightness-0"
             alt="Settings"
           />
         </div>

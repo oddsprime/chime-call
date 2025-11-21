@@ -11,14 +11,14 @@
     template: `
       <div
         data-toggle-screensize
-        class="h-[68px] w-[68px] rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer"
+        class="w-12 lg:w-17 h-12 lg:h-17 rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer"
         role="button"
         aria-label="Toggle fullscreen"
         @click="$emit('toggle')"
       >
         <img
           src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/maximize-02.svg"
-          class="w-8 h-8"
+          class="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
           alt="Toggle fullscreen"
         />
       </div>

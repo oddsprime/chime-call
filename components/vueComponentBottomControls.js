@@ -23,7 +23,7 @@
       template: `
         <div :class="containerClass">
           <bottom-left-info :user-initials="userInitials" />
-          <div class="flex justify-center items-center gap-4 flex-none lg:flex-1 lg:w-1/3">
+          <div data-bottom-panel-center-buttons class="flex justify-center items-center gap-3 lg:gap-4 flex-none lg:flex-1 lg:w-1/3">
             <bottom-center-controls
               :toggle-camera="toggleCamera"
               :toggle-microphone="toggleMicrophone"
