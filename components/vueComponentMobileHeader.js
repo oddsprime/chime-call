@@ -10,7 +10,7 @@
       },
       template: `
         <div
-          class="justify-center flex-col w-full absolute top-0 sm:top-20 lg:hidden flex items-center gap-2 px-3 py-2 rounded-pill"
+          class="justify-center flex-col w-full absolute top-0 sm:top-20 lg:hidden flex items-center gap-2 px-3 py-2 bg-[linear-gradient(180deg,rgba(24,34,48,0.20)_30%,rgba(24,34,48,0)_100%)]"
           aria-label="Back to fansocial">
           <div class="flex lg:hidden flex-col">
             <span class="text-white text-sm font-medium block text-center lg:hidden" data-call-type-text>

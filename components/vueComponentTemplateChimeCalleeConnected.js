@@ -119,8 +119,9 @@
               <back-button :show="substate !== 'connecting'"></back-button>
               <div class="flex flex-col lg:flex-row z-10 gap-2 justify-between left-0 right-0 lg:rounded-none rounded-full items-center lg:relative absolute bottom-4 lg:bottom-0 lg:w-full w-full lg:mx-0 px-4  py-0">
                 <bottom-left-info :user-initials="userInitials" />
-                <div class="flex items-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 md:w-[calc(100%-424px)] sm:w-full">
-                  <camera-mic-controls :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" :chime-call-settings="chimeCallSettings"/>
+                <div class="flex items-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
+                <cam-mic-tooltip :is-visible="false"></cam-mic-tooltip>
+                <camera-mic-controls :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" :chime-call-settings="chimeCallSettings"/>
                 </div>
                 <div class="w-1/3"></div>
                 <mobile-join-button :substate="substate" @join="handleJoinClick"></mobile-join-button>

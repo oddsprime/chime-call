@@ -76,6 +76,7 @@
   <script src="components/prejoin/vueComponentsBackgroundsEffects.js" defer></script>
   <script src="components/prejoin/vueComponentsSettingsPanel.js" defer></script>
   <script src="components/prejoin/vueComponentsMobileJoinButton.js" defer></script>
+  <script src="components/prejoin/CamMicTooltip.js" defer></script>
   <script src="components/vueComponentTemplateChimeCalleeConnected.js" defer></script>
 
   <!-- Bottom Panel Buttons -->
@@ -1815,6 +1816,7 @@
           if (typeof registerCameraButton === 'function') registerCameraButton(app);
           if (typeof registerMicrophoneButton === 'function') registerMicrophoneButton(app);
           if (typeof registerEndCallButton === 'function') registerEndCallButton(app);
+          if (typeof registerCamMicTooltip === 'function') registerCamMicTooltip(app);
 
             // Calling Flow
 
@@ -1985,8 +1987,9 @@
       }
 
       // One source of truth for base classes
+      // rounded-xl removed
       const BASE_TILE =
-        "tile flex items-center justify-center rounded-xl bg-black text-white video-card";
+        "tile flex items-center justify-center bg-black text-white video-card";
 
       const MINI_OVERLAY = "mini-overlay";
       const FULL_VIEW = "full-view";
@@ -2360,9 +2363,9 @@ CallHandler.dipatchUI("caller:startCall");
           }
       
           // base & helper functions (keeps existing "video-card" or "hidden")
-          const BASE_TILE    = "tile flex items-center justify-center rounded-xl bg-black text-white";
+          const BASE_TILE    = "tile flex items-center justify-center  bg-black text-white"; // rounded-xl removed
           const MINI_OVERLAY = "absolute bottom-[10rem] right-4 w-[25rem] h-[15rem] z-50 rounded-xl overflow-hidden";
-          const FULL_VIEW    = "absolute inset-0 w-auto h-auto rounded-xl";
+          const FULL_VIEW    = "absolute inset-0 w-auto h-auto "; // removed rounded-xl
       
           function setBase(el) {
             if (!el) return;

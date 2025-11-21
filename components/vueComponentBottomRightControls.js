@@ -7,7 +7,7 @@
           chimeCallSettings: { type: Object, required: false },
         },
         template: `
-          <div class="flex justify-end items-center gap-4 lg:w-1/3">
+          <div data-bottom-panel-right-buttons  class="flex justify-end items-center gap-3 lg:gap-4 lg:w-1/3">
             <tip-buttons />
             <react-button />
             <chat-button :toggle-chat="toggleChat" :chime-call-settings="chimeCallSettings" />
