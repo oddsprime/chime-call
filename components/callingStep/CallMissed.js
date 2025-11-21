@@ -5,7 +5,7 @@
   
       app.component('call-missed', {
         template: `
-          <div class="w-[32.8rem] h-[32.8rem] flex flex-col bg-black/80 relative pt-[2.5rem] gap-[1.5rem]" >
+          <div class="w-[30rem] h-[26.5rem] flex flex-col bg-black/80 relative pt-[3.2rem] gap-6 rounded-4" >
           <!-- header -->
             <div class="flex items-center justify-center gap-2">
               <img
@@ -16,9 +16,9 @@
               <h2 class="text-lg font-bold text-white">Missed Video Call</h2>
             </div>
       <!-- calling-info-section tt-->
-      <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x-close-thin.svg" class="absolute h-[24px] w-[24px] top-1 right-1 cursor-pointer"/>
+      <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x-close-thin.svg" class="absolute h-[24px] w-[24px] top-2 right-2 cursor-pointer"/>
       <div
-        class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-max flex flex-col justify-center items-center gap-4 pointer-events-none z-0"
+        class=" w-full flex flex-col justify-center items-center gap-2 pointer-events-none"
       >
         <img
           src="https://i.ibb.co.com/ynbtT1F1/call-rejected.webp"
@@ -27,7 +27,7 @@
         />
 
         <span class="text-sm text-white text-center"
-          >@jennyben did not answer your call...</span
+          >You missed a call from @sammisjelly187</span
         >
       </div>
     </div>
