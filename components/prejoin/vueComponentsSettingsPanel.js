@@ -43,7 +43,7 @@
     >
       <!-- Settings Header & Content -->
       <div
-        class="text-white cursor-pointer lg:hidden flex items-end justify-end absolute top-3 right-3"
+        class="text-white cursor-pointer lg:hidden flex items-end justify-end absolute top-2 md:top-3 right-2 md:top-3"
       >
         <img
           data-sidebar-close
@@ -53,7 +53,7 @@
         />
       </div>
 
-      <div class="pb-20 pt-8 lg:pb-0 lg:pt-0 mobile-landscape:pb-0 flex flex-col gap-2 md:!gap-0 h-full overflow-scroll">
+      <div class="pb-20 px-[0.8rem] md:px-4 pt-8 lg:pb-0 lg:pt-0 mobile-landscape:pb-0 flex flex-col gap-2 md:!gap-0 h-full overflow-scroll">
         <settings-audio-video />
         <settings-backgrounds-effects />
       </div><!-- Chat Setting Section -->

@@ -14,12 +14,12 @@
         <header
           data-background-accordion-header
           @click="toggle"
-          class="cursor-pointer hover:bg-white/5 flex justify-between items-center p-2 md:!p-4 w-full text-left transition-colors duration-200"
+          class="cursor-pointer hover:bg-white/5 flex justify-between items-center py-2 md:!py-4 w-full text-left transition-colors duration-200"
           :aria-expanded="isOpen.toString()"
         >
           <div class="flex items-center gap-2">
             <img src="assets/background-drop-icon.svg" alt="icon" />
-            <span class="text-white text-base font-medium">Backgrounds &amp; Effects</span>
+            <span class="text-white lg:text-base text-sm font-medium">Backgrounds &amp; Effects</span>
           </div>
           <img
             src="assets/chevron-down-white.svg"
@@ -34,7 +34,7 @@
           data-backgrounds-accordion-content
           :data-open="isOpen ? 'true' : 'false'"
           :class="isOpen ? 'flex flex-col gap-4' : 'hidden'"
-          class="transition-all duration-300 ease-in-out overflow-hidden px-2 md:!px-4 pb-2 md:!pb-4"
+          class="transition-all duration-300 ease-in-out overflow-hidden pb-2 md:!pb-4"
           ref="content"
         >
           <div>

@@ -14,7 +14,7 @@
         <header
           data-audio-video-accordion-header
           @click="toggle"
-          class="flex justify-between items-center p-2 md:!p-4 cursor-pointer hover:bg-white/5 transition-colors duration-200"
+          class="flex justify-between items-center py-2 md:!py-4 cursor-pointer hover:bg-white/5 transition-colors duration-200"
           :aria-expanded="isOpen.toString()"
         >
           <div class="flex items-center gap-2">
@@ -34,7 +34,7 @@
           data-audio-video-accordion-content
           :data-open="isOpen ? 'true' : 'false'"
           :class="isOpen ? 'flex flex-col gap-4' : 'hidden'"
-          class="transition-all duration-300 ease-in-out overflow-hidden px-2 md:!px-4 pb-2 md:!pb-4"
+          class="transition-all duration-300 ease-in-out overflow-hidden pb-2 md:!pb-4"
           ref="content"
         >
           <!-- CAMERA -->
