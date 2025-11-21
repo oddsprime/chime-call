@@ -147,7 +147,7 @@
         }
       },
       template: `
-        <div v-if="show" class="w-[32.8rem] h-[32.8rem] flex flex-col bg-black/80 relative rounded-md overflow-hidden">
+        <div v-if="show" class="w-[37.5rem] h-[37.5rem] flex flex-col bg-black/80 relative rounded-md overflow-hidden">
           <!-- calling-info-section (centered) -->
           <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col justify-center items-center gap-4 pointer-events-none">
             <div class="flex flex-col justify-center items-center gap-2">
@@ -200,8 +200,8 @@
 
           <!-- small preview box (top-right) -->
           <div v-if="isCameraOn" 
-           video-on class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1]">
-            <video ref="previewVideo" data-cam-preview autoplay playsinline muted style="width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 4px;"></video>
+           video-on class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[12.0rem] h-[6.8rem] bg-black rounded z-[1]">
+            <video ref="previewVideo" data-cam-preview autoplay playsinline muted class="w-full h-full block rounded object-cover"></video>
             <!-- Loading overlay spinner - inline fallback for now -->
             <div v-if="isSyncingVideo" style="
               position: absolute;
@@ -227,7 +227,7 @@
               "></div>
             </div>
           </div>
-          <div v-if="isCameraOff" video-off class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[7.5rem] h-[4.3125rem] bg-black rounded z-[1]">
+          <div v-if="isCameraOff" video-off class="absolute right-[0.90625rem] top-3 flex justify-center items-center w-[12.0rem] h-[6.8rem] bg-black rounded z-[1]">
             <img :src="videoIcon" alt="preview" class="w-7 h-7" />
           </div>
 

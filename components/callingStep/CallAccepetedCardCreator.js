@@ -28,7 +28,12 @@
             <!-- user info section -->
             <div class="flex flex-col justify-center items-center gap-2">
               <!-- avatar-container -->
-              <waiting-avatar :show="true"></waiting-avatar>
+              <waiting-avatar 
+                wrapperSize="w-[10.0rem] h-[10.0rem]" 
+                avatarSize="w-[7.0rem] h-[7.0rem]" 
+                spinnerClass="top-[-1.5rem] left-[-1.5rem] min-w-[13rem] h-[13rem]"
+                :show="true">
+              </waiting-avatar>
 
   
               <!-- name & username container -->
