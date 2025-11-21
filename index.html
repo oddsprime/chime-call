@@ -100,6 +100,7 @@
   <script src="components/callingStep/CallMissed.js"></script>
   <script src="components/callingStep/WaitingToJoin.js"></script>
   <script src="components/callingStep/waiting-avatar.js"></script>
+  <script src="components/vueComponentAvatar.js"></script>
 
 
   <style>
@@ -1828,6 +1829,8 @@
           if (typeof registerCallMissed=== 'function') registerCallMissed(app);
           if (typeof registerWaitingToJoin=== 'function') registerWaitingToJoin(app);
           if (typeof registerWaitingAvatar === "function") { registerWaitingAvatar(app);}
+          if (typeof registerDefaultAvatar === "function") { registerDefaultAvatar(app);}
+
 
           
 
