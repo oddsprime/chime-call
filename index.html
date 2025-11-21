@@ -218,7 +218,14 @@
         'grid-cols-[1fr_0px] md:grid-cols-[1fr_auto]': !ChimeCallSettings.callChatStatus || isMobile
       }">
       <div class="relative w-full h-screen" data-chime-templates>
-        <div data-video-container class="w-full h-full absolute">
+        <div
+          data-video-container
+          class="h-full absolute lg:p-2"
+          :class="{
+            'w-full lg:[width:calc(100%-405px)]': ChimeCallSettings.callChatStatus,
+            'w-full': !ChimeCallSettings.callChatStatus || isMobile
+          }"
+        >
           <div id="reaction-layer" class="absolute w-full h-full inset-0 pointer-events-none z-[3000]"></div>
           <!-- ===============================
           CHIME TILE LAYOUT — INTEGRATED
@@ -238,7 +245,7 @@
             <div
                 id="video-containers"
                 class="relative overflow-hidden w-full h-full
-                        grid grid-cols-12 grid-rows-2 gap-3"
+                        grid grid-cols-12 grid-rows-2 gap-3 lg:rounded-1"
                 data-layout="host_attendee">
       
               <div id="host-container" data-name="host" data-container-type="host" data-attendee-id="" data-role="host" class="tile flex items-center justify-center rounded-xl text-white video-card">
@@ -452,8 +459,8 @@
                         <transition name="slide">
                           <div v-show="ChimeCallSettings.callChatStatus" 
                               class="absolute right-0 h-full
-                               shadow-xl overflow-y-auto
-                               w-full md:w-[400px] z-50">
+                               shadow-xl
+                               w-full lg:w-[405px] z-50 lg:pt-2 lg:pb-2 lg:pr-2">
                             <chat-sidebar :toggle-chat="toggleChat"></chat-sidebar>
                           </div>
                         </transition>
