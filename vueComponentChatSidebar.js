@@ -57,7 +57,7 @@ const ChatSidebar = defineComponent({
                     <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/send-03.svg" class="invert"/>
                   </button>
                 </div>
-                <div v-show="currentRole === 'Creator'" @click="setActivePanel('gift')">
+                <div @click="setActivePanel('gift')">
                   <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/gift-02.svg" id="giftToggleBtn" class="w-[24px] h-[24px] cursor-pointer" aria-label="Open gift menu">
                 </div>
 
@@ -136,7 +136,7 @@ const ChatSidebar = defineComponent({
             </div>
           </div>
           <!-- Default Footer: Add Custom Gift -->
-          <div id="giftFooterDefault" class="px-4 py-2 w-full">
+          <div v-show="currentRole === 'Creator'" id="giftFooterDefault" class="px-4 py-2 w-full">
             <div class="btn w-full">
               <button class="flex px-4 py-[10px] flex justify-center items-center rounded-full w-full bg-brand-primary">
                 <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">

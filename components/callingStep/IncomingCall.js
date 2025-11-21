@@ -16,7 +16,7 @@
         template: `
           <div
           v-if="show"
-            class="w-full md:w-[30rem] lg:w-[30rem] flex flex-col justify-center items-center gap-6 px-2 py-4 md:px-4 rounded-t-[0.9375rem] md:rounded-[0.9375rem] bg-[#0C111DE5] absolute  md:relative lg:relative bottom-0"
+            class="w-full md:w-[30rem] lg:w-[30rem] flex flex-col justify-center items-center gap-6 px-2 py-4 md:!px-4 rounded-t-[0.9375rem] md:rounded-[0.9375rem] bg-[#0C111DE5] absolute  md:relative lg:relative bottom-0"
           >
             <!-- header -->
             <div class="flex items-center gap-2">
@@ -31,7 +31,12 @@
             <!-- user info section -->
             <div class="flex flex-col justify-center items-center gap-2">
               <!-- avatar-container -->
-              <waiting-avatar :show="true"></waiting-avatar>
+              <waiting-avatar 
+                wrapperSize="w-[10.0rem] h-[10.0rem]" 
+                avatarSize="w-[7.0rem] h-[7.0rem]" 
+                spinnerClass="top-[-1.5rem] left-[-1.5rem] min-w-[13rem] h-[13rem]"
+                :show="true">
+              </waiting-avatar>
   
               <!-- name & username container -->
               <div class="flex flex-col justify-center items-center gap-1">
@@ -66,7 +71,7 @@
               <div class="flex justify-center items-center w-full">
                 <button
                 @click="$emit('options')"
-                class="flex items-center gap-0.5 text-sm font-medium text-[#98A2B3]"
+                class="flex items-center gap-1 text-sm font-medium text-[#98A2B3]"
               >
                 <span>Other Options</span>
                 <img :src="optionsIcon" alt="options" class="w-5 h-5" />
