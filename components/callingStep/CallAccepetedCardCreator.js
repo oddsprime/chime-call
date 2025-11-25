@@ -18,7 +18,7 @@
             <!-- header -->
             <div class="flex items-center gap-2">
               <img
-                src="https://i.ibb.co.com/9khyD9Md/phone-incoming-02.webp"
+                src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-incoming-02.svg"
                 alt="phone-incoming"
                 class="w-6 h-6"
               />
@@ -39,7 +39,7 @@
               <!-- name & username container -->
               <div class="flex flex-col justify-center items-center gap-1">
                 <h3 class="text-base font-medium text-white">{{ calleName }}</h3>
-                <span class="text-xs leading-normal text-[#98A2B3]">{{ calleHandle }}</span>
+                <span class="text-xs leading-normal text-[#98A2B3] font-medium">{{ calleHandle }}</span>
               </div>
             </div>
           </div>

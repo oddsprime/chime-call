@@ -7,9 +7,9 @@
           show: { type: Boolean, default: false },
           callerName: { type: String, default: 'SirStrawberry' },
           callerHandle: { type: String, default: '@sammisjelly187' },
-          acceptIcon: { type: String, default: 'https://i.ibb.co.com/tp6wnC7q/phone-1.webp' },
-          declineIcon: { type: String, default: 'https://i.ibb.co.com/20sMWhjg/phone-x-1-1.webp' },
-          optionsIcon: { type: String, default: 'https://i.ibb.co.com/67sJstbJ/dots-horizontal-gray.webp' },
+          acceptIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-1.svg' },
+          declineIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-x.svg' },
+          optionsIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/dots-horizontal-gray.svg' },
           heading: { type: String, default: 'Incoming Video Call' },
         },
         emits: ['accept', 'decline', 'options'],
@@ -21,7 +21,7 @@
             <!-- header -->
             <div class="flex items-center gap-2">
               <img
-                src="https://i.ibb.co.com/9khyD9Md/phone-incoming-02.webp"
+                src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-call-01.svg"
                 alt="phone-incoming"
                 class="w-6 h-6"
               />

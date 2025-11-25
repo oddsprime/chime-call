@@ -10,8 +10,8 @@
         videoIcon: { type: String, default: 'https://i.ibb.co.com/zVx0JM7X/block-video-1.webp' },
         micIcon: { type: String, default: 'https://i.ibb.co.com/zVhRMm4s/microphone-off-01.webp' },
         endCallIcon: { type: String, default: 'https://i.ibb.co.com/nshWZFfD/Communication.webp' },
-        camIcon: { type: String, default: 'https://i.ibb.co.com/Kx9RdLBK/camera-01.webp' },
-        micPermissionIcon: { type: String, default: 'https://i.ibb.co.com/qF1tJWsZ/microphone-01.webp' }
+        camIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/camera-01.svg' },
+        micPermissionIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/microphone-01.svg' }
       },
       emits: ['cancel', 'settings', 'toggle', 'toggle-mic', 'end-call'],
       components: {
@@ -54,8 +54,8 @@
       template: `
       <div v-if="show" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-screen h-screen flex flex-col justify-center items-center gap-6 z-[1]">
       <!-- allow-permission-section -->
-            <div class="flex flex-col gap-4 p-6 w-80 xl:w-auto  rounded-[0.625rem] bg-[#0C111D80] backdrop-blur-[50px]">
-              <p class="text-lg font-semibold text-white text-left xl:text-center">
+            <div class="flex flex-col gap-4 p-6 w-[32.0rem]  rounded-[0.625rem] bg-[#0C111D80] backdrop-blur-[50px]">
+              <p class="text-lg font-semibold text-white text-left ">
                 Please allow below permission to start call:
               </p>
 
@@ -76,11 +76,11 @@
 
               <!-- buttons -->
               <div class="flex gap-2">
-                <button @click="$emit('cancel')" class="w-full h-10 bg-white/30 px-[0.5625rem] py-2 border-[1.5px] border-[#07F468] cursor-pointer rounded">
+                <button @click="$emit('cancel')" class="w-full h-10 bg-white/30 px-[0.5625rem] py-2 border-[1.5px] border-[#07F468] cursor-pointer">
                   <span class="text-base font-medium text-[#07F468]">Cancel</span>
                 </button>
 
-                <button @click="$emit('settings')" class="w-full h-10 bg-[#07F468] px-[0.5625rem] py-2 border-[1.5px] border-[#07F468] cursor-pointer rounded">
+                <button @click="$emit('settings')" class="w-full h-10 bg-[#07F468] px-[0.5625rem] py-2 border-[1.5px] border-[#07F468] cursor-pointer">
                   <span class="text-base font-medium text-black">Settings</span>
                 </button>
               </div>
