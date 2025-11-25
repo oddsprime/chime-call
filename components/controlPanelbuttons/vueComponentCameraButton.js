@@ -12,7 +12,13 @@
         // optional direct callback for backward compatibility
         onToggle: { type: Function, required: false },
         // optional aria label override
-        ariaLabel: { type: String, default: 'Toggle camera' }
+        ariaLabel: { type: String, default: 'Toggle camera' },
+        // optional button classes for customization
+        buttonClasses: { type: String, default: '' },
+        // Button size class
+        buttonSizeClasses: { type: String, default: 'h-[68px] w-[68px]' },
+        // Icon size class
+        iconSizeClasses: { type: String, default: 'w-8 h-8' },
       },
       emits: ['toggle'],
       template: `
@@ -22,17 +28,17 @@
           :aria-pressed="enabled"
           :aria-label="ariaLabel"
           :class="[
-            'h-[68px] w-[68px] w-12 h-12 min-w-12 rounded-full flex items-center justify-center cursor-pointer transition-all duration-200',
+            buttonClasses || (buttonSizeClasses + ' rounded-full flex items-center justify-center cursor-pointer transition-all duration-200'),
             enabled ? 'bg-white/75' : 'bg-white/5'
           ]"
           @click="handleClick"
         >
-          <img v-if="enabled"
+          <img v-show="enabled"
             src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/camera-icon.svg"
-            class="w-8 h-8 top-camera-enabled-icon" alt="Video camera">
-          <img v-else
+            :class="[iconSizeClasses, 'top-microphone-enabled-icon']" alt="Video camera">
+          <img v-show="!enabled"
             src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/disableCamera.svg"
-            class="w-8 h-8 top-camera-disabled-icon" alt="Video camera disabled">
+            :class="[iconSizeClasses, 'top-microphone-disabled-icon']" alt="Video camera disabled">
         </button>
       `,
       methods: {

@@ -8,6 +8,7 @@
         toggleChat: { type: Function, required: false },
         chimeCallSettings: { type: Object, required: false },
       },
+      emits: ['end-call'],
       computed: {
         containerClass() {
           const base =
@@ -28,6 +29,7 @@
               :toggle-camera="toggleCamera"
               :toggle-microphone="toggleMicrophone"
               :chime-call-settings="chimeCallSettings"
+              @end-call="$emit('end-call')"
             />
           </div>
           <bottom-right-controls

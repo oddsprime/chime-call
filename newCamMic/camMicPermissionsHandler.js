@@ -161,6 +161,7 @@ class CamMicPermissionsHandler {
       statusCamera: '[data-cam-mic-element="status-camera"]',
       statusMicrophone: '[data-cam-mic-element="status-microphone"]',
       reloadRequired: '[data-cam-mic-element="reload-required"]',
+      masterVideo: 'footer [data-cam-mic-element="video-preview"]', // The one in footer (source of truth)
     };
     
     // Iterate through required elements
@@ -364,8 +365,17 @@ class CamMicPermissionsHandler {
           const shouldShow = missingNeededCamera || missingNeededMicrophone;
           // Check if permission screen should be shown
           if (shouldShow) {
-            // Create detail object for Vue state event
-            const detail = { state: "waitingForCamMicPermissions", substate: "", ts: Date.now() };
+            // Determine current side (caller or callee) from CallHandler or current UI state
+            const currentSide = (typeof CallHandler !== 'undefined' && CallHandler._currentSide) 
+              ? CallHandler._currentSide 
+              : (typeof CallHandler !== 'undefined' && CallHandler._currentUIState && CallHandler._currentUIState.startsWith('callee:'))
+                ? 'callee'
+                : 'caller';
+            // Create detail object for Vue state event with appropriate state prefix
+            const waitingState = currentSide === 'callee' 
+              ? 'callee:waitingForCamMicPermissions' 
+              : 'caller:waitingForCamMicPermissions';
+            const detail = { state: waitingState, substate: "", ts: Date.now() };
             // Dispatch Vue state event
             document.dispatchEvent(new CustomEvent("chime-ui::state", { detail }));
           }
@@ -1016,6 +1026,83 @@ class CamMicPermissionsHandler {
   }
 
   /**
+   * Ensure master video element exists in footer.
+   *
+   * Creates a hidden master video element in the footer that serves as the source of truth for camera streams.
+   *
+   * @author Auto-generated
+   * @version 1.0.0
+   * @since -
+   * @updated -
+   * @link https://docs.example.com/CamMicPermissionsHandler#_ensureFooterVideo #TODO
+   *
+   * @returns {void}
+   */
+  static _ensureFooterVideo() {
+    console.log(`[CamMicPermissionsHandler] [_ensureFooterVideo] [Start] {}`);
+    // Check if footer exists
+    let footer = document.querySelector('footer');
+    if (!footer) {
+      console.log(
+        `[CamMicPermissionsHandler] [_ensureFooterVideo] [Data] ${JSON.stringify({
+          action: "creating_footer",
+        })}`
+      );
+      // Check if document body exists
+      if (!document.body) {
+        // Throw error if document body missing
+        throw new Error('Cannot create footer: document.body is missing');
+      }
+      // Create new footer element
+      footer = document.createElement('footer');
+      // Set footer styles to hide it
+      footer.style.cssText = 'margin-top: 40px; padding: 20px; border-top: 1px solid #ccc; display: none;';
+      // Append footer to document body
+      document.body.appendChild(footer);
+    }
+    
+    // Check if master video exists
+    let masterVideo = footer.querySelector('[data-cam-mic-element="video-preview"]');
+    if (!masterVideo) {
+      console.log(
+        `[CamMicPermissionsHandler] [_ensureFooterVideo] [Data] ${JSON.stringify({
+          action: "creating_master_video",
+        })}`
+      );
+      // Create master video element
+      masterVideo = document.createElement('video');
+      // Set attributes for master video
+      masterVideo.setAttribute('data-cam-mic-element', 'video-preview');
+      masterVideo.setAttribute('autoplay', '');
+      masterVideo.setAttribute('playsinline', '');
+      // Hide master video element
+      masterVideo.style.display = 'none';
+      // Append master video to footer
+      footer.appendChild(masterVideo);
+      // Check if master video creation failed
+      if (!masterVideo) {
+        // Throw error if master video not found
+        throw new Error('Failed to create master video element in footer');
+      }
+    }
+    
+    // Check if footer or master video are missing
+    if (!footer || !masterVideo) {
+      // Throw error if master video not ensured
+      throw new Error('Failed to ensure master video exists');
+    }
+    // Hide footer element
+    footer.hidden = true;
+    // Log completion with element existence status
+    console.log(
+      `[CamMicPermissionsHandler] [_ensureFooterVideo] [End] ${JSON.stringify({
+        footerExists: !!footer,
+        masterVideoExists: !!masterVideo,
+      })}`
+    );
+  }
+
+  /**
    * Orchestrate both camera and microphone permission requests.
    *
    * Handles the complete workflow for requesting both camera and microphone permissions.
@@ -1046,61 +1133,62 @@ class CamMicPermissionsHandler {
       console.warn(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 1: CHECK] Failed:`, err);
     }
     
-    // **STEP 2**: If need prompt, show UI BEFORE requesting
-    const needsPrompt = (cameraState === 'prompt' || microphoneState === 'prompt');
-    if (needsPrompt) {
-      console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SHOW UI] Dispatching UI:ShowWaiting`);
-      window.dispatchEvent(new CustomEvent('CamMic:UI:ShowWaiting', {
-        detail: { 
-          needCamera: cameraState === 'prompt', 
-          needMicrophone: microphoneState === 'prompt',
-          mode: 'both'
-        }
-      }));
-      
-      // **SANITY CHECK**: Poll DOM until VISIBLE element appears (not just text in script tags)
-      console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Waiting for DOM to show waiting text...`);
-      const waitingText = "Waiting for camera or microphone permissions";
-      const appRoot = document.getElementById('app');
-      if (!appRoot) {
-        console.warn("[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] #app root not found in DOM");
-      }
-      let found = false;
-      let attempts = 0;
-      const maxAttempts = 30; // 3 seconds max (100ms * 30)
-      
-      while (!found && attempts < maxAttempts) {
-        // Find ALL elements that contain the text
-        const scope = appRoot || document;
-        const allElements = Array.from(scope.querySelectorAll('*')).filter(el => {
-          return el.textContent.includes(waitingText) && 
-                 el.offsetParent !== null && // Element is visible
-                 (el.textContent.trim().startsWith('[Callee]') || el.textContent.trim().startsWith('[Caller]')); // It's a state message
-        });
-        
-        if (allElements.length > 0) {
-          console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ✅ VISIBLE element found in DOM after ${attempts * 100}ms`);
-          console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Element text:`, allElements[0].textContent.substring(0, 100));
-          found = true;
-        } else {
-          console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ⏳ VISIBLE element not found yet, waiting 100ms... (attempt ${attempts + 1}/${maxAttempts})`);
-          await new Promise(resolve => setTimeout(resolve, 100));
-          attempts++;
-        }
-      }
-      
-      if (!found) {
-        console.error(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ❌ VISIBLE element NEVER appeared in DOM after ${maxAttempts * 100}ms!`);
-        alert(`⚠️ UI failed to update! Visible element with waiting text never appeared. This is a critical bug.\n\nVue state was set, but DOM did not render.`);
-      } else {
-        // Extra 200ms to ensure user can actually see it
-        console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Waiting extra 200ms for user to see it...`);
-        await new Promise(resolve => setTimeout(resolve, 200));
-        console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SHOW UI] ✅ Ready to proceed with request`);
-      }
-    } else {
-      console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SKIP] Already granted - no UI needed`);
-    }
+    // **STEP 2**: COMMENTED OUT FOR TESTING - If need prompt, show UI BEFORE requesting
+    // const needsPrompt = (cameraState === 'prompt' || microphoneState === 'prompt');
+    // if (needsPrompt) {
+    //   console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SHOW UI] Dispatching UI:ShowWaiting`);
+    //   window.dispatchEvent(new CustomEvent('CamMic:UI:ShowWaiting', {
+    //     detail: { 
+    //       needCamera: cameraState === 'prompt', 
+    //       needMicrophone: microphoneState === 'prompt',
+    //       mode: 'both'
+    //     }
+    //   }));
+    //   
+    //   // **SANITY CHECK**: Poll DOM until VISIBLE element appears (not just text in script tags)
+    //   console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Waiting for DOM to show waiting text...`);
+    //   const waitingText = "Waiting for camera or microphone permissions";
+    //   const appRoot = document.getElementById('app');
+    //   if (!appRoot) {
+    //     console.warn("[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] #app root not found in DOM");
+    //   }
+    //   let found = false;
+    //   let attempts = 0;
+    //   const maxAttempts = 30; // 3 seconds max (100ms * 30)
+    //   
+    //   while (!found && attempts < maxAttempts) {
+    //     // Find ALL elements that contain the text
+    //     const scope = appRoot || document;
+    //     const allElements = Array.from(scope.querySelectorAll('*')).filter(el => {
+    //       return el.textContent.includes(waitingText) && 
+    //              el.offsetParent !== null && // Element is visible
+    //              (el.textContent.trim().startsWith('[Callee]') || el.textContent.trim().startsWith('[Caller]')); // It's a state message
+    //     });
+    //     
+    //     if (allElements.length > 0) {
+    //       console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ✅ VISIBLE element found in DOM after ${attempts * 100}ms`);
+    //       console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Element text:`, allElements[0].textContent.substring(0, 100));
+    //       found = true;
+    //     } else {
+    //       console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ⏳ VISIBLE element not found yet, waiting 100ms... (attempt ${attempts + 1}/${maxAttempts})`);
+    //       await new Promise(resolve => setTimeout(resolve, 100));
+    //       attempts++;
+    //     }
+    //   }
+    //   
+    //   if (!found) {
+    //     console.error(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] ❌ VISIBLE element NEVER appeared in DOM after ${maxAttempts * 100}ms!`);
+    //     alert(`⚠️ UI failed to update! Visible element with waiting text never appeared. This is a critical bug.\n\nVue state was set, but DOM did not render.`);
+    //   } else {
+    //     // Extra 200ms to ensure user can actually see it
+    //     console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SANITY CHECK] Waiting extra 200ms for user to see it...`);
+    //     await new Promise(resolve => setTimeout(resolve, 200));
+    //     console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SHOW UI] ✅ Ready to proceed with request`);
+    //   }
+    // } else {
+    //   console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SKIP] Already granted - no UI needed`);
+    // }
+    console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 2: SKIPPED] Commented out for testing - proceeding directly to permission request`);
     
     // **STEP 3**: Start watching permission changes
     console.log(`[CamMicPermissionsHandler] [_orchestrateBoth] [STEP 3: WATCH] Starting permission watcher`);
@@ -1589,6 +1677,8 @@ class CamMicPermissionsHandler {
     this._syncMultipleSelects();
     // Ensure footer select elements exist
     this._ensureFooterSelects();
+    // Ensure footer video element exists
+    this._ensureFooterVideo();
     
     // Set initialized flag to true
     this._isInitialized = true;
@@ -1897,6 +1987,73 @@ class CamMicPermissionsHandler {
     // Store event handler reference for cleanup
     this._eventHandlers.push({ event: "CamMic:Preview:Start", handler: previewStartHandler, target: window });
 
+    // Define preview started handler function to sync video previews
+    const previewStartedHandler = () => {
+      // Sync all video previews when preview starts
+      this._syncMultipleVideoPreviews();
+    };
+    // Add event listener for preview started event
+    window.addEventListener("CamMic:Preview:Started", previewStartedHandler);
+    // Store event handler reference for cleanup
+    this._eventHandlers.push({ event: "CamMic:Preview:Started", handler: previewStartedHandler, target: window });
+
+    // Define chime UI state change handler function to sync video previews
+    const chimeUIStateHandler = () => {
+      // Check if master video has active stream
+      const masterVideo = this._ui?.masterVideo || (() => {
+        const footer = document.querySelector('footer');
+        return footer ? footer.querySelector('[data-cam-mic-element="video-preview"]') : null;
+      })();
+      // Check if master video has active stream
+      if (masterVideo && masterVideo.srcObject) {
+        // Sync all video previews when state changes and master has stream
+        this._syncMultipleVideoPreviews();
+      }
+    };
+    // Add event listener for chime UI state change event
+    document.addEventListener("chime-ui::state", chimeUIStateHandler);
+    // Store event handler reference for cleanup
+    this._eventHandlers.push({ event: "chime-ui::state", handler: chimeUIStateHandler, target: document });
+
+    // Setup MutationObserver to watch for new [data-cam-preview] or [data-cam-mic-element="video-preview"] elements
+    const videoPreviewObserver = new MutationObserver((mutations) => {
+      let shouldSync = false;
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check if the added node itself is a video preview element
+            if (node.matches && (node.matches('[data-cam-preview]') || node.matches('[data-cam-mic-element="video-preview"]'))) {
+              shouldSync = true;
+            }
+            // Check if any child elements are video preview elements
+            if (node.querySelectorAll) {
+              const previews = node.querySelectorAll('[data-cam-preview], [data-cam-mic-element="video-preview"]');
+              if (previews.length > 0) {
+                shouldSync = true;
+              }
+            }
+          }
+        });
+      });
+      
+      // If new preview elements were added, trigger sync after a short delay to ensure DOM is ready
+      if (shouldSync) {
+        console.log('[CamMicPermissionsHandler] [MutationObserver] New video preview element(s) detected, triggering sync');
+        setTimeout(() => {
+          this._syncMultipleVideoPreviews();
+        }, 100);
+      }
+    });
+    
+    // Start observing the document body for new elements
+    videoPreviewObserver.observe(document.body, {
+      childList: true,
+      subtree: true
+    });
+    
+    // Store observer reference for cleanup
+    this._videoPreviewObserver = videoPreviewObserver;
+
     console.log(`[CamMicPermissionsHandler] [_wireEvents] [End] {}`);
   }
 
@@ -1975,6 +2132,21 @@ class CamMicPermissionsHandler {
       }
       // Clear mutation observer reference
       this._mutationObserver = null;
+    }
+
+    // Disconnect video preview MutationObserver if it exists
+    if (this._videoPreviewObserver) {
+      try {
+        this._videoPreviewObserver.disconnect();
+        this._videoPreviewObserver = null;
+        console.log('[CamMicPermissionsHandler] [unbindAll] Video preview observer disconnected');
+      } catch (error) {
+        console.warn(
+          `[CamMicPermissionsHandler] [unbindAll] [Error] Failed to disconnect video preview observer: ${JSON.stringify({
+            message: error?.message || error,
+          })}`
+        );
+      }
     }
     
     // Stop all active streams
@@ -2277,6 +2449,112 @@ class CamMicPermissionsHandler {
     sync("mic");
     // Log completion
     console.log(`[CamMicPermissionsHandler] [_syncMultipleSelects] [End] {}`);
+  }
+
+  /**
+   * Sync multiple video preview elements with master video.
+   *
+   * Finds all preview elements with data-cam-preview attribute and syncs their srcObject with the master video.
+   *
+   * @author Auto-generated
+   * @version 1.0.0
+   * @since -
+   * @updated -
+   * @link https://docs.example.com/CamMicPermissionsHandler#_syncMultipleVideoPreviews #TODO
+   *
+   * @returns {void}
+   */
+  static _syncMultipleVideoPreviews() {
+    // Log the start of syncing multiple video previews
+    console.log(`[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [Start] {}`);
+    // Get master video from UI cache or query footer
+    const masterVideo = this._ui?.masterVideo || (() => {
+      const footer = document.querySelector('footer');
+      return footer ? footer.querySelector('[data-cam-mic-element="video-preview"]') : null;
+    })();
+    
+    // Check if master video is missing
+    if (!masterVideo) {
+      // Log warning if master video missing
+      console.warn(
+        `[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [Warning] ${JSON.stringify({
+          message: 'Master video not found, skipping sync',
+        })}`
+      );
+      return;
+    }
+    
+    // Check if master video has active stream
+    const masterStream = masterVideo.srcObject;
+    if (!masterStream) {
+      // Log info if master video has no stream
+      console.log(
+        `[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [Data] ${JSON.stringify({
+          message: 'Master video has no active stream, skipping sync',
+        })}`
+      );
+      return;
+    }
+    
+    // Find all preview elements with data-cam-preview attribute OR data-cam-mic-element="video-preview"
+    const previewElements = document.querySelectorAll('[data-cam-preview], [data-cam-mic-element="video-preview"]');
+    // Log syncing to previews with count
+    console.log(
+      `[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [Data] ${JSON.stringify({
+        action: "syncing_to_previews",
+        previewCount: previewElements.length,
+        hasMasterStream: !!masterStream,
+      })}`
+    );
+    
+    // Iterate through each preview element
+    previewElements.forEach((previewElement) => {
+      // Check if preview element is HTML video element
+      if (!(previewElement instanceof HTMLVideoElement)) {
+        // Return early if not HTML video element
+        return;
+      }
+      
+      // Find parent container to dispatch events
+      const container = previewElement.closest('[video-on]') || previewElement.parentElement;
+      if (container) {
+        // Dispatch event to show spinner (Vue components can listen)
+        container.dispatchEvent(new CustomEvent('video-sync-start'));
+      }
+      
+      // Set srcObject to master's srcObject
+      previewElement.srcObject = masterStream;
+      
+      // Attempt to play preview element
+      previewElement.play().then(() => {
+        // Wait for video to actually show frames before hiding spinner
+        const checkVideoReady = () => {
+          if (previewElement.readyState >= 2 && previewElement.videoWidth > 0) {
+            if (container) {
+              container.dispatchEvent(new CustomEvent('video-sync-complete'));
+            }
+          } else {
+            setTimeout(checkVideoReady, 100);
+          }
+        };
+        checkVideoReady();
+      }).catch((playError) => {
+        // Log play error but ignore interruption errors
+        if (playError?.message && !playError.message.includes('interrupted')) {
+          console.error(
+            `[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [Error] ${JSON.stringify({
+              message: playError?.message || playError,
+            })}`
+          );
+        }
+        if (container) {
+          container.dispatchEvent(new CustomEvent('video-sync-complete'));
+        }
+      });
+    });
+    
+    // Log completion
+    console.log(`[CamMicPermissionsHandler] [_syncMultipleVideoPreviews] [End] {}`);
   }
 }
 // Iinitialization system for CamMicPermissionsHandler

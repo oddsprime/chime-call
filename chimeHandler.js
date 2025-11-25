@@ -20,6 +20,9 @@ class chimeHandler {
   // Track which attendees already have video elements to prevent duplicates
   static _attendeesWithVideos = new Set();
 
+  // Track video/audio state for each attendee (source of truth for status icons)
+  static _attendeeStates = new Map(); // attendeeId -> { videoEnabled: bool, audioEnabled: bool }
+
   // Meeting metadata (from URL parameter)
   static _meetingMetadata = null;
 
@@ -260,9 +263,14 @@ class chimeHandler {
             // Caller: transition to connectedJoined immediately when connected
             // (don't wait for stream since caller joins with media OFF)
             console.log("[chimeHandler] [FIX] Caller connected - transitioning to caller:connectedJoined");
+            // Get callerId and calleeId from _invite
+            const callerId = CallHandler._invite?.callerId || null;
+            const calleeId = CallHandler._invite?.calleeId || null;
             CallHandler.dipatchUI("caller:connectedJoined", "none", {
               attendeeId: attendeeId,
               externalUserId: externalUserId,
+              callerId: callerId,
+              calleeId: calleeId,
             });
           } else if (side === "callee") {
             // Callee: transition to joined when they manually join (in callee:connected state)
@@ -284,6 +292,16 @@ class chimeHandler {
 
       // Immediately send mapping packet via data channel
       this._sendMappingPacket(attendeeId, externalUserId);
+      
+      // Create debug overlays for LOCAL user immediately on join
+      // (remote users get overlays when their mapping packet arrives)
+      const myRole = this._currentUserRole;
+      if (myRole) {
+        console.log(`[chimeHandler] [coreChime:connected] Creating overlays for LOCAL user: ${attendeeId.substring(0,8)}..., role: ${myRole}`);
+        this.UiMapTileToCard(attendeeId, myRole);
+      } else {
+        console.warn(`[chimeHandler] [coreChime:connected] Cannot create overlays - role not set yet`);
+      }
 
       // Send mapping packet once more after a short delay to ensure delivery
       setTimeout(() => {
@@ -295,7 +313,100 @@ class chimeHandler {
       const { reason } = e.detail;
       this._updateStatus(`Disconnected: ${reason}`);
 
-      // Store meeting info for rejoin
+      // If user manually ended the call, starting a new call, or call is terminated, don't show rejoin alert
+      const isUserEnded = reason === "User ended call" || reason === "User left" || reason === "Starting new call";
+      const isCallTerminated = typeof CallHandler !== "undefined" && CallHandler._isCallTerminated === true;
+      
+      // Check if current state is terminated or disconnected (already handled)
+      const currentState = typeof CallHandler !== "undefined" ? CallHandler._currentUIState : null;
+      const isStateTerminated = currentState && (
+        currentState.includes("terminated") || 
+        currentState.includes("rejected") || 
+        currentState.includes("declined")
+      );
+      
+      // Check if new call is being initiated (caller:callWaiting state)
+      const isNewCallStarting = currentState === "caller:callWaiting";
+      
+      // Determine if we should skip dispatching shared:disconnected
+      const shouldSkipDisconnectedDispatch = 
+        reason === "Starting new call" ||  // Intentional cleanup, not an error
+        isCallTerminated ||                 // Call already terminated
+        isStateTerminated ||                // Already in terminated state
+        isNewCallStarting;                  // New call already initiated
+      
+      if (isUserEnded || isCallTerminated) {
+        console.log("[chimeHandler] User ended call - skipping rejoin alert");
+        DebugLogger.addLog(
+          "terminated",
+          "NOTICE",
+          "coreChime:disconnected",
+          "User ended call - no rejoin option"
+        );
+        
+        // Only dispatch disconnected state if it's an actual unexpected disconnection
+        // Skip if: call already terminated, new call starting, or already in callWaiting
+        if (!shouldSkipDisconnectedDispatch) {
+          try {
+            if (typeof CallHandler !== "undefined" && CallHandler.dipatchUI) {
+              CallHandler.dipatchUI("shared:disconnected", "none", { reason });
+            }
+          } catch (err) {
+            console.error("[chimeHandler] Failed to dispatch disconnected state:", err);
+          }
+        } else {
+          console.log("[chimeHandler] Skipping shared:disconnected dispatch", {
+            reason,
+            isCallTerminated,
+            isStateTerminated,
+            isNewCallStarting,
+            currentState
+          });
+        }
+        
+        // Stop all camera/mic streams via event
+        try {
+          window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));
+          console.log('[chimeHandler] Dispatched CamMic:Streams:Stop event');
+        } catch (err) {
+          console.error('[chimeHandler] Failed to dispatch CamMic:Streams:Stop:', err);
+        }
+        
+        return; // Exit early - no rejoin prompt for user-initiated termination
+      }
+
+      // Check skip conditions again for the else branch (Code: 1 from audioVideoDidStop)
+      // This happens when coreChime.leave() triggers audioVideoDidStop which emits another disconnected event
+      const shouldSkipUnexpectedDisconnection = 
+        reason === "Starting new call" ||  // Intentional cleanup
+        reason === "User ended call" ||    // User-initiated termination
+        reason === "User left" ||          // User-initiated termination
+        isCallTerminated ||                // Call already terminated
+        isStateTerminated ||                // Already in terminated state
+        isNewCallStarting;                 // New call already initiated
+      
+      // If we should skip, don't show alert or try to reconnect
+      if (shouldSkipUnexpectedDisconnection) {
+        console.log("[chimeHandler] Skipping unexpected disconnection handling", {
+          reason,
+          isCallTerminated,
+          isStateTerminated,
+          isNewCallStarting,
+          currentState
+        });
+        
+        // Stop all camera/mic streams via event
+        try {
+          window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));
+          console.log('[chimeHandler] Dispatched CamMic:Streams:Stop event');
+        } catch (err) {
+          console.error('[chimeHandler] Failed to dispatch CamMic:Streams:Stop:', err);
+        }
+        
+        return; // Exit early - don't show alert or try to reconnect
+      }
+      
+      // Store meeting info for rejoin (only for unexpected disconnections)
       const localIds = coreChime.getLocalIdentifiers();
       const meetingInfo = coreChime.getMeetingInfo();
       const attendeeInfo = coreChime.getAttendeeInfo();
@@ -309,7 +420,7 @@ class chimeHandler {
         console.error("[chimeHandler] Failed to dispatch networkIssue state:", err);
       }
       
-      // Show alert with rejoin option
+      // Show alert with rejoin option (only for unexpected disconnections)
       const shouldRejoin = confirm(
         "❌ Disconnected from meeting\n\n" +
         "Reason: " + reason + "\n\n" +
@@ -535,51 +646,145 @@ class chimeHandler {
         console.log(`[chimeHandler] Tile ${tileId} for ${boundAttendeeId}: hasStream=${hasStream}, active=${active} → Video ${videoIsActuallyOn ? 'ON' : 'OFF'}`);
         
         // Detect when user has actually joined with media (local tile with stream)
+        // BUT DO NOT dispatch if already in active call (shared:inCall)
         if (isLocal && hasStream && !this._hasShownJoinedAlert) {
-          console.log("[chimeHandler] 🎉 User has joined with media - dispatching joined state");
-          this._hasShownJoinedAlert = true;
+          // Check current state - if already in shared:inCall, skip the dispatch
+          const currentState = (typeof CallHandler !== 'undefined' && CallHandler._currentUIState) || '';
+          const isAlreadyInCall = currentState === 'shared:inCall';
           
-          // Dispatch joined state to UI
-          if (typeof CallHandler !== 'undefined' && typeof CallHandler.dipatchUI === 'function') {
-            // Determine if caller or callee based on current side tracked in CallHandler
-            const side = CallHandler._currentSide;
-            if (side === "caller") {
-              CallHandler.dipatchUI("caller:connectedJoined", "none", {
-                attendeeId: boundAttendeeId,
-              });
-            } else if (side === "callee") {
-              CallHandler.dipatchUI("callee:joined", "none", {
-                attendeeId: boundAttendeeId,
-              });
-            } else {
-              // Fallback if side not set yet
-              console.log("[chimeHandler] Unknown side, using callee as fallback");
-              CallHandler.dipatchUI("callee:joined", "none", {
-                attendeeId: boundAttendeeId,
-              });
+          if (isAlreadyInCall) {
+            console.log("[chimeHandler] ⏭️ SKIPPING joined state dispatch - already in shared:inCall (video toggled during call)");
+            this._hasShownJoinedAlert = true; // Set flag to prevent future triggers
+          } else {
+            console.log("[chimeHandler] 🎉 User has joined with media - dispatching joined state");
+            this._hasShownJoinedAlert = true;
+            
+            // Dispatch joined state to UI
+            if (typeof CallHandler !== 'undefined' && typeof CallHandler.dipatchUI === 'function') {
+              // Determine if caller or callee based on current side tracked in CallHandler
+              const side = CallHandler._currentSide;
+              if (side === "caller") {
+                // Get callerId and calleeId from _invite
+                const callerId = CallHandler._invite?.callerId || null;
+                const calleeId = CallHandler._invite?.calleeId || null;
+                CallHandler.dipatchUI("caller:connectedJoined", "none", {
+                  attendeeId: boundAttendeeId,
+                  callerId: callerId,
+                  calleeId: calleeId,
+                });
+              } else if (side === "callee") {
+                CallHandler.dipatchUI("callee:joined", "none", {
+                  attendeeId: boundAttendeeId,
+                });
+              } else {
+                // Fallback if side not set yet
+                console.log("[chimeHandler] Unknown side, using callee as fallback");
+                CallHandler.dipatchUI("callee:joined", "none", {
+                  attendeeId: boundAttendeeId,
+                });
+              }
             }
           }
         }
         
-        // Check if this matches a pending video toggle
+        // Check if this matches a pending video toggle (ON only) - LOCAL USER ONLY
+        // Remote users don't need spinner - they transition instantly
         const pending = this._pendingVideoToggles[boundAttendeeId];
-        if (pending && pending.expected === videoIsActuallyOn) {
-          const duration = Date.now() - pending.timestamp;
-          console.log(`[chimeHandler] ✅ Video toggle confirmed in ${duration}ms - hiding loading overlay`);
-          
-          // Clear the 200ms delay if spinner hasn't shown yet
-          clearTimeout(pending.showSpinnerTimeout);
-          
-          // Hide the loading overlay
+        
+        // Clean up any stale pending toggles for remote users (shouldn't exist, but safety check)
+        if (!isLocal && pending) {
+          console.log(`%c[VIDEO TOGGLE] 🧹 Cleaning up stale pending toggle for remote user ${boundAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 3px;');
+          if (pending.pollInterval) clearInterval(pending.pollInterval);
+          if (pending.showSpinnerTimeout) clearTimeout(pending.showSpinnerTimeout);
+          if (pending.timeout) clearTimeout(pending.timeout);
           this._hideLoadingOverlay(boundAttendeeId);
+          delete this._pendingVideoToggles[boundAttendeeId];
+        }
+        
+        // Only process spinner logic for local user
+        if (isLocal && pending && pending.expected === true && videoIsActuallyOn && hasStream) {
+          // Video is ON and stream is present - use Method 7 (Polling) to detect when feed is ready
+          console.log(`%c[VIDEO TOGGLE] 🎥 Video stream detected - starting Method 7 (Polling) for LOCAL ${boundAttendeeId.substring(0,8)}...`, 'background: #007bff; color: white; font-weight: bold; padding: 5px;');
           
-          if (typeof DebugLogger !== "undefined") {
-            DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler.tile-updated', `Video Toggle Complete: ${boundAttendeeId.substring(0,8)}...`, {
-              state: videoIsActuallyOn ? 'ON' : 'OFF',
-              duration: `${duration}ms`
-            });
+          // Find the video element
+          const container = document.querySelector(`[data-attendee-id="${boundAttendeeId}"]`);
+          const videoElement = container?.querySelector('video');
+          
+          if (videoElement) {
+            // Clear existing polling if any
+            if (pending.pollInterval) {
+              clearInterval(pending.pollInterval);
+            }
+            
+            // METHOD 7: Polling (readyState >= 2 && dimensions > 0)
+            let pollCount = 0;
+            pending.pollInterval = setInterval(() => {
+              pollCount++;
+              const isReady = videoElement.readyState >= 2 && videoElement.videoWidth > 0 && videoElement.videoHeight > 0;
+              
+              console.log(`%c[VIDEO TOGGLE] [POLL #${pollCount}] Checking readiness...`, 'background: #6c757d; color: white;', {
+                readyState: videoElement.readyState,
+                videoWidth: videoElement.videoWidth,
+                videoHeight: videoElement.videoHeight,
+                isReady
+              });
+              
+              if (isReady) {
+                clearInterval(pending.pollInterval);
+                const duration = Date.now() - pending.timestamp;
+                console.log(`%c[VIDEO TOGGLE] ✅ Method 7 (Polling) - Video feed ready in ${duration}ms (${pollCount} polls)`, 'background: #28a745; color: white; font-weight: bold; padding: 5px;', {
+                  readyState: videoElement.readyState,
+                  videoWidth: videoElement.videoWidth,
+                  videoHeight: videoElement.videoHeight,
+                  pollCount,
+                  duration
+                });
+                
+                // Clear the 200ms delay if spinner hasn't shown yet
+                clearTimeout(pending.showSpinnerTimeout);
+                clearTimeout(pending.timeout); // Clear fallback timeout
+                
+                // Hide the loading overlay
+                this._hideLoadingOverlay(boundAttendeeId);
+                delete this._pendingVideoToggles[boundAttendeeId];
+                
+                if (typeof DebugLogger !== "undefined") {
+                  DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler.tile-updated', `Video Toggle Complete (Method 7): ${boundAttendeeId.substring(0,8)}...`, {
+                    state: 'ON',
+                    duration: `${duration}ms`,
+                    pollCount
+                  });
+                }
+              }
+              
+              // Stop polling after 5 seconds (fallback)
+              if (pollCount >= 50) {
+                clearInterval(pending.pollInterval);
+                console.warn(`%c[VIDEO TOGGLE] ⏱️ Polling timeout after 50 attempts (5s)`, 'background: #f00; color: #fff; padding: 5px;');
+                clearTimeout(pending.showSpinnerTimeout);
+                this._hideLoadingOverlay(boundAttendeeId);
+                delete this._pendingVideoToggles[boundAttendeeId];
+              }
+            }, 100); // Poll every 100ms
+          } else {
+            console.warn(`%c[VIDEO TOGGLE] ⚠️ Video element not found for ${boundAttendeeId.substring(0,8)}...`, 'background: #ffc107; color: black; padding: 5px;');
           }
         }
+        
+        // Update state tracking
+        const currentState = this._attendeeStates.get(boundAttendeeId) || {};
+        const newState = { ...currentState, videoEnabled: videoIsActuallyOn };
+        this._attendeeStates.set(boundAttendeeId, newState);
+        
+        console.log(`%c[STATE TRACKING] [TILE UPDATE] Video state changed for ${boundAttendeeId.substring(0,8)}...`, 'background: #0f0; color: #000; font-weight: bold', {
+          attendeeId: boundAttendeeId,
+          tileId,
+          hasStream,
+          active,
+          videoIsActuallyOn,
+          previousState: currentState,
+          newState
+        });
         
         this._updateVideoOffIndicator(boundAttendeeId, videoIsActuallyOn);
         this._updateDebugOverlay(boundAttendeeId, { videoEnabled: videoIsActuallyOn });
@@ -848,17 +1053,40 @@ class chimeHandler {
             container.style.position = "relative";
           }
           
+          // ALWAYS create debug overlay, video-off indicator, and status icons immediately
+          // when tile is created - regardless of hasStream state
+          console.log(`[chimeHandler] [OVERLAY CREATE] Creating overlays for ${boundAttendeeId.substring(0,8)}... hasStream=${hasStream}, active=${active}`);
+          
+          // Set initial state BEFORE creating icons (use ACTUAL hasStream value)
+          const currentState = this._attendeeStates.get(boundAttendeeId) || {};
+          // For audio: keep existing state if set, otherwise read from join settings
+          const audioStateFromSettings = window.settings?.callMicStatus ?? false;
+          const newState = { 
+            videoEnabled: hasStream, 
+            audioEnabled: currentState.audioEnabled !== undefined ? currentState.audioEnabled : audioStateFromSettings 
+          };
+          this._attendeeStates.set(boundAttendeeId, newState);
+          console.log(`%c[STATE TRACKING] [TILE CREATE] Set state for ${boundAttendeeId.substring(0,8)}...`, 'background: #00f; color: #fff; font-weight: bold', {
+            attendeeId: boundAttendeeId,
+            hasStream,
+            previousState: currentState,
+            newState,
+            tileId,
+            isLocal,
+            active
+          });
+          
           // Create debug overlay (absolute positioned, won't affect video sizing)
           this._createDebugOverlay(container, tileId, boundAttendeeId);
           
           // Create VIDEO OFF indicator (hidden by default, shown when video disabled)
           this._createVideoOffIndicator(container, boundAttendeeId);
           
-          // Create status icons (camera & mic indicators)
+          // Create status icons (camera & mic indicators) - ALWAYS VISIBLE
           this._createStatusIcons(container, boundAttendeeId);
 
           console.log(
-            `[chimeHandler] Created and appended video to ${container.id} (container made visible) - tracked attendee ${boundAttendeeId}`
+            `[chimeHandler] ✅ Created video + overlays for ${container.id} - attendee ${boundAttendeeId.substring(0,8)}... hasStream=${hasStream}`
           );
 
           // For local videos, call UiMapTileToCard to properly map to container
@@ -931,12 +1159,53 @@ class chimeHandler {
               this.UiMapTileToCard(boundAttendeeId, mapping.role);
             } else {
               console.warn(
-                `[chimeHandler] No mapping found for remote video ${boundAttendeeId} - container will be updated when mapping arrives`
+                `[chimeHandler] No mapping found for remote video ${boundAttendeeId} - creating overlays now, container will be updated when mapping arrives`
               );
               // Still show container even without mapping (will be updated when mapping arrives)
               container.classList.remove("hidden");
               container.classList.add("active");
               container.setAttribute("data-attendee-id", boundAttendeeId);
+              
+              // ===================================================================
+              // CREATE OVERLAYS IMMEDIATELY (even without mapping)
+              // This ensures status icons and debug data are visible immediately
+              // ===================================================================
+              const computedPos = window.getComputedStyle(container).position;
+              if (computedPos === "static") {
+                container.style.position = "relative";
+              }
+
+              // Set initial state BEFORE creating icons (use ACTUAL hasStream value)
+              const currentState = this._attendeeStates.get(boundAttendeeId) || {};
+              this._attendeeStates.set(boundAttendeeId, { 
+                videoEnabled: hasStream, 
+                audioEnabled: currentState.audioEnabled !== undefined ? currentState.audioEnabled : true 
+              });
+              console.log(`[chimeHandler] Set state for ${boundAttendeeId.substring(0,8)}... (no mapping)`, { videoEnabled: hasStream, audioEnabled: this._attendeeStates.get(boundAttendeeId).audioEnabled });
+
+              // Create debug overlay
+              if (!container.querySelector('.debug-overlay')) {
+                console.log(`[chimeHandler] Creating debug overlay for ${boundAttendeeId.substring(0,8)}... (no mapping yet)`);
+                this._createDebugOverlay(container, tileId, boundAttendeeId);
+              }
+
+              // Create VIDEO OFF indicator
+              if (!container.querySelector('.video-off-indicator')) {
+                console.log(`[chimeHandler] Creating video-off indicator for ${boundAttendeeId.substring(0,8)}... (no mapping yet)`);
+                this._createVideoOffIndicator(container, boundAttendeeId);
+                const indicator = container.querySelector('.video-off-indicator');
+                if (indicator) {
+                  indicator.style.display = 'flex';
+                }
+              }
+
+              // Create status icons
+              if (!container.querySelector('.status-icons')) {
+                console.log(`[chimeHandler] Creating status icons for ${boundAttendeeId.substring(0,8)}... (no mapping yet)`);
+                this._createStatusIcons(container, boundAttendeeId);
+              }
+
+              console.log(`[chimeHandler] ✅ All overlays created for ${boundAttendeeId.substring(0,8)}... (awaiting mapping)`);
             }
           }
         }
@@ -987,8 +1256,11 @@ class chimeHandler {
       const { attendeeId, muted, volume, signalStrength } = e.detail;
       console.log("[chimeHandler] Audio status changed", e.detail);
       
-      // Update debug overlay and status icons with audio status
+      // Update state tracking and overlays with audio status
       if (attendeeId) {
+        const currentState = this._attendeeStates.get(attendeeId) || {};
+        this._attendeeStates.set(attendeeId, { ...currentState, audioEnabled: !muted });
+        
         this._updateDebugOverlay(attendeeId, { 
           audioEnabled: !muted,
           connectionStrength: signalStrength > 0.5 ? 'Good' : signalStrength > 0.2 ? 'Fair' : 'Poor'
@@ -1083,33 +1355,39 @@ class chimeHandler {
           attendeeInfo: attendeeInfoWrapped,
         });
 
-        // Join the meeting with BOTH audio and video OFF (user must manually turn ON)
+        // Join the meeting with settings from window.settings (user's preference)
         // Use mockCallData mediaType if available, fallback to callType
         const mediaType = window.mockCallData?.mediaType || callType;
+        
+        // Read settings right before joining
+        const enableVideo = window.settings?.callCamStatus ?? false;
+        const enableAudio = window.settings?.callMicStatus ?? false;
+        
         console.log(
-          "[chimeHandler] Joining coreChime with media OFF - mediaType:",
-          mediaType
+          "[chimeHandler] Joining coreChime with settings - mediaType:",
+          mediaType,
+          "video:",
+          enableVideo,
+          "audio:",
+          enableAudio
         );
         
-        // ALWAYS join with media OFF - user must manually turn ON
+        // Join with user's preferred settings
         await coreChime.join({
-          enableAudio: false,
-          enableVideo: false,
+          enableAudio: enableAudio,
+          enableVideo: enableVideo,
         });
 
-        console.log("[chimeHandler] Successfully joined Chime meeting with media OFF");
+        console.log("[chimeHandler] Successfully joined Chime meeting with video:", enableVideo, "audio:", enableAudio);
         
-        // Update UI state to reflect OFF
+        // Update UI state to reflect actual settings
         if (window.vueState && window.vueState.meeting) {
-          window.vueState.meeting.videoFeed = false;
-          window.vueState.meeting.audioFeed = false;
+          window.vueState.meeting.videoFeed = enableVideo;
+          window.vueState.meeting.audioFeed = enableAudio;
         }
-        if (window.settings) {
-          window.settings.callCamStatus = false;
-          window.settings.callMicStatus = false;
-        }
+        // Settings are already set correctly from user's preference, no need to reset
         
-        console.log("[chimeHandler] ✅ Joined with media OFF - user must manually turn ON video/audio");
+        console.log("[chimeHandler] ✅ Joined successfully with user's preferred settings");
       } catch (error) {
         console.error("[chimeHandler] Error joining Chime meeting:", error);
       }
@@ -1505,11 +1783,15 @@ class chimeHandler {
    * handleVideoToggle(on: boolean)
    * ==================================================================== */
   static handleVideoToggle(on) {
-    console.log("[chimeHandler] [handleVideoToggle] Called with:", on);
+    console.log(`%c[VIDEO TOGGLE] Called with: ${on ? 'ON' : 'OFF'}`, 'background: #f0f; color: #fff; font-weight: bold; padding: 5px');
     
     // Check if in chime call and joined
     const isInChimeCall = coreChime && coreChime._meetingSession && coreChime._audioVideo;
-    console.log("[chimeHandler] [handleVideoToggle] isInChimeCall:", isInChimeCall);
+    console.log(`%c[VIDEO TOGGLE] isInChimeCall: ${isInChimeCall}`, 'background: #f0f; color: #fff', {
+      hasCoreChime: !!coreChime,
+      hasMeetingSession: !!(coreChime && coreChime._meetingSession),
+      hasAudioVideo: !!(coreChime && coreChime._audioVideo)
+    });
     
     if (!isInChimeCall) {
       // Not in chime call - use CamMic preview
@@ -1560,33 +1842,69 @@ class chimeHandler {
       return;
     }
 
-    console.log(`[chimeHandler] [handleVideoToggle] Requesting video: ${on ? 'ON' : 'OFF'}`);
+    console.log(`%c[VIDEO TOGGLE] Requesting Chime video: ${on ? 'ON' : 'OFF'}`, 'background: #0ff; color: #000; font-weight: bold');
     
     // Get local attendee ID
     const localAttendeeId = coreChime.getLocalIdentifiers().attendeeId;
     
+    console.log(`%c[VIDEO TOGGLE] Local attendee ID: ${localAttendeeId?.substring(0,8)}...`, 'background: #0ff; color: #000');
+    
     if (localAttendeeId) {
-      // Show loading overlay with 200ms delay (prevents flicker for instant toggles)
-      const showSpinner = setTimeout(() => {
-        this._showLoadingOverlay(localAttendeeId, on ? "Turning video on..." : "Turning video off...");
-      }, 200);
-      
-      // Track pending state
-      this._pendingVideoToggles[localAttendeeId] = {
-        expected: on,
-        timestamp: Date.now(),
-        showSpinnerTimeout: showSpinner,
-        // Auto-hide after 5 seconds
-        timeout: setTimeout(() => {
-          console.warn(`[handleVideoToggle] ⏱️ Timeout - hiding overlay after 5s for ${localAttendeeId.substring(0,8)}...`);
+      // Only show spinner when turning video ON (not OFF)
+      if (on) {
+        // Show loading overlay with 200ms delay (prevents flicker for instant toggles)
+        const showSpinner = setTimeout(() => {
+          console.log(`%c[VIDEO TOGGLE] Showing loading overlay for ${localAttendeeId.substring(0,8)}...`, 'background: #0ff; color: #000');
+          this._showLoadingOverlay(localAttendeeId, "");
+        }, 200);
+        
+        // Track pending state (only for video ON)
+        this._pendingVideoToggles[localAttendeeId] = {
+          expected: on,
+          timestamp: Date.now(),
+          showSpinnerTimeout: showSpinner,
+          // Auto-hide after 5 seconds (fallback)
+          timeout: setTimeout(() => {
+            const pending = this._pendingVideoToggles[localAttendeeId];
+            if (pending) {
+              console.warn(`%c[VIDEO TOGGLE] ⏱️ Timeout - hiding overlay after 5s for ${localAttendeeId.substring(0,8)}...`, 'background: #f00; color: #fff');
+              // Clear polling if still running
+              if (pending.pollInterval) {
+                clearInterval(pending.pollInterval);
+              }
+              this._hideLoadingOverlay(localAttendeeId);
+              delete this._pendingVideoToggles[localAttendeeId];
+            }
+          }, 5000)
+        };
+        
+        console.log(`%c[VIDEO TOGGLE] Pending toggle tracked (ON)`, 'background: #0ff; color: #000', {
+          attendeeId: localAttendeeId.substring(0,8),
+          expected: on,
+          timestamp: Date.now()
+        });
+      } else {
+        // Video OFF - hide any existing spinner immediately and clean up polling
+        if (this._pendingVideoToggles[localAttendeeId]) {
+          clearTimeout(this._pendingVideoToggles[localAttendeeId].showSpinnerTimeout);
+          clearTimeout(this._pendingVideoToggles[localAttendeeId].timeout);
+          // Clear polling interval if it exists
+          if (this._pendingVideoToggles[localAttendeeId].pollInterval) {
+            clearInterval(this._pendingVideoToggles[localAttendeeId].pollInterval);
+            console.log(`%c[VIDEO TOGGLE] 🧹 Cleared polling interval for ${localAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 5px;');
+          }
           this._hideLoadingOverlay(localAttendeeId);
-        }, 5000)
-      };
+          delete this._pendingVideoToggles[localAttendeeId];
+        }
+        console.log(`%c[VIDEO TOGGLE] Video OFF - no spinner needed`, 'background: #0ff; color: #000');
+      }
     }
     
     // Toggle video in Chime SDK - DON'T update UI here!
     // The tile update event will fire with the ACTUAL state from Chime
+    console.log(`%c[VIDEO TOGGLE] Calling coreChime.toggleVideo(${on})`, 'background: #0ff; color: #000; font-weight: bold');
     coreChime.toggleVideo(on);
+    console.log(`%c[VIDEO TOGGLE] coreChime.toggleVideo() completed - waiting for tile update event`, 'background: #0ff; color: #000');
     
     // Note: VIDEO OFF indicator will be updated by tile event (source of truth)
   }
@@ -1633,10 +1951,24 @@ class chimeHandler {
 
     coreChime.toggleAudio(on);
     
-    // Update debug overlay for local attendee
+    // Update state tracking, debug overlay, and status icons for local attendee (same as video)
     const localIds = coreChime.getLocalIdentifiers();
     if (localIds && localIds.attendeeId) {
+      console.log(`%c[AUDIO TOGGLE] Updating local state for ${localIds.attendeeId.substring(0,8)}... to ${on ? 'ON' : 'OFF'}`, 'background: #0f0; color: #000; font-weight: bold');
+      
+      // Update state tracking (same as video toggle)
+      const currentState = this._attendeeStates.get(localIds.attendeeId) || {};
+      this._attendeeStates.set(localIds.attendeeId, { ...currentState, audioEnabled: on });
+      console.log(`%c[STATE TRACKING] [LOCAL AUDIO] Updated state for ${localIds.attendeeId.substring(0,8)}...`, 'background: #00f; color: #fff; font-weight: bold', {
+        attendeeId: localIds.attendeeId,
+        previousState: currentState,
+        newState: { ...currentState, audioEnabled: on }
+      });
+      
+      // Update UI overlays (same as video toggle)
       this._updateDebugOverlay(localIds.attendeeId, { audioEnabled: on });
+      this._updateStatusIcons(localIds.attendeeId, { audioEnabled: on }); // Update mic icon
+      console.log(`%c[AUDIO TOGGLE] ✅ Updated local audio status: ${on ? 'ON' : 'OFF'}`, 'background: #0f0; color: #000');
     }
   }
 
@@ -1706,6 +2038,39 @@ class chimeHandler {
    * handleDataReceive(flag, payload, from)
    * ==================================================================== */
   static handleDataReceive(flag, payload, from) {
+    // Guard: Ignore all incoming Chime data messages when call is terminated
+    if (typeof CallHandler !== 'undefined' && CallHandler._currentUIState) {
+      const isTerminated = CallHandler._isCallTerminated || (
+        CallHandler._currentUIState.includes('terminated') || 
+        CallHandler._currentUIState.includes('rejected') ||
+        CallHandler._currentUIState.includes('declined') ||
+        CallHandler._currentUIState === 'ended'
+      );
+      
+      if (isTerminated) {
+        console.log(`%c[GUARD] 🚫 Blocked Chime data message - call terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+          flag,
+          isCallTerminated: CallHandler._isCallTerminated,
+          currentState: CallHandler._currentUIState,
+          from: from?.attendeeId?.substring(0, 8) || 'unknown'
+        });
+        
+        if (typeof DebugLogger !== 'undefined') {
+          DebugLogger.addLog('terminated', 'NOTICE', 'handleDataReceive', `Blocked ${flag} - call terminated`, {
+            isCallTerminated: CallHandler._isCallTerminated,
+            state: CallHandler._currentUIState,
+            flag
+          });
+        }
+        return; // Block the message
+      }
+      
+      console.log(`%c[GUARD] ✅ Allowing Chime data message`, 'background: #28a745; color: white; padding: 3px;', {
+        flag,
+        currentState: CallHandler._currentUIState
+      });
+    }
+    
     // Check if message is for us (target filtering)
     const myAttendeeId = coreChime.getLocalIdentifiers().attendeeId;
     const target = payload.target || "all";
@@ -1769,29 +2134,17 @@ class chimeHandler {
       });
     }
     
-    // Update the UI for this attendee
+    // Update the UI for this attendee (NO SPINNER for remote - transitions instantly)
     if (attendeeId) {
-      // Show loading overlay for remote toggle (with 200ms delay)
-      const showSpinner = setTimeout(() => {
-        this._showLoadingOverlay(attendeeId, ""); // Removed "Remote turning video on..." text
-      }, 200);
+      // Update state tracking
+      const currentState = this._attendeeStates.get(attendeeId) || {};
+      this._attendeeStates.set(attendeeId, { ...currentState, videoEnabled });
       
-      // Track pending state (will be cleared when tile update confirms)
-      this._pendingVideoToggles[attendeeId] = {
-        expected: videoEnabled,
-        timestamp: Date.now(),
-        showSpinnerTimeout: showSpinner,
-        // Auto-hide after 5 seconds
-        timeout: setTimeout(() => {
-          console.warn(`[handleIncomingVideoToggle] ⏱️ Timeout - hiding overlay after 5s for ${attendeeId.substring(0,8)}...`);
-          this._hideLoadingOverlay(attendeeId);
-        }, 5000)
-      };
-      
+      // Update UI immediately (no spinner needed for remote)
       this._updateVideoOffIndicator(attendeeId, videoEnabled);
       this._updateDebugOverlay(attendeeId, { videoEnabled });
       this._updateStatusIcons(attendeeId, { videoEnabled }); // Update status icons
-      console.log(`[chimeHandler] ✅ Updated remote video status: ${videoEnabled ? 'ON' : 'OFF'} for ${attendeeId}`);
+      console.log(`[chimeHandler] ✅ Updated remote video status: ${videoEnabled ? 'ON' : 'OFF'} for ${attendeeId} (no spinner - instant transition)`);
     }
   }
   
@@ -1810,8 +2163,11 @@ class chimeHandler {
       });
     }
     
-    // Update the debug overlay and status icons for this attendee
+    // Update state tracking and overlays for this attendee
     if (attendeeId) {
+      const currentState = this._attendeeStates.get(attendeeId) || {};
+      this._attendeeStates.set(attendeeId, { ...currentState, audioEnabled });
+      
       this._updateDebugOverlay(attendeeId, { audioEnabled });
       this._updateStatusIcons(attendeeId, { audioEnabled }); // Update status icons
       console.log(`[chimeHandler] ✅ Updated remote audio status: ${audioEnabled ? 'ON' : 'OFF'} for ${attendeeId}`);
@@ -2500,61 +2856,71 @@ class chimeHandler {
   static _createStatusIcons(container, attendeeId) {
     // Check if icons already exist
     if (container.querySelector('.status-icons')) {
+      console.log(`%c[STATUS ICONS] [CREATE] Icons already exist for ${attendeeId.substring(0, 8)}...`, 'background: #888; color: #fff', {
+        containerId: container.id || 'no-id'
+      });
       return;
     }
 
+    // Get ACTUAL current state from state tracking Map
+    // Default to BOTH OFF (safer assumption - avoids showing incorrect "ON" status)
+    const state = this._attendeeStates.get(attendeeId) || { videoEnabled: false, audioEnabled: false };
+    
+    console.log(`%c[STATUS ICONS] [CREATE] Creating icons for ${attendeeId.substring(0, 8)}...`, 'background: #f0f; color: #fff; font-weight: bold', {
+      attendeeId,
+      state,
+      container: container.id || 'no-id',
+      containerTag: container.tagName
+    });
+
     const iconsContainer = document.createElement('div');
     iconsContainer.className = 'status-icons';
-    iconsContainer.style.cssText = `
-      position: absolute !important;
-      bottom: 10px !important;
-      left: 10px !important;
-      display: flex !important;
-      gap: 8px !important;
-      z-index: 100 !important;
-      pointer-events: none !important;
-    `;
     iconsContainer.setAttribute('data-attendee-id', attendeeId);
+    
+    // MINIMAL styling to make them visible and positioned correctly
+    iconsContainer.style.position = 'absolute';
+    iconsContainer.style.top = '5px'; // Top-right corner
+    iconsContainer.style.right = '5px'; // Position in top-right
+    iconsContainer.style.left = 'auto';
+    iconsContainer.style.zIndex = '999';
+    iconsContainer.style.display = 'flex';
+    iconsContainer.style.gap = '8px';
+    iconsContainer.style.fontSize = '11px';
+    iconsContainer.style.fontWeight = 'bold';
+    iconsContainer.style.fontFamily = 'monospace';
+    iconsContainer.style.pointerEvents = 'none';
 
-    // Camera icon
-    const cameraIcon = document.createElement('div');
-    cameraIcon.className = 'camera-icon';
-    cameraIcon.style.cssText = `
-      width: 36px !important;
-      height: 36px !important;
-      border-radius: 50% !important;
-      background: rgba(0, 0, 0, 0.7) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 18px !important;
-      transition: none !important;
-    `;
-    cameraIcon.innerHTML = '📹'; // Default: camera on
-    cameraIcon.setAttribute('data-status', 'on');
+    // Camera status span - use ACTUAL state
+    const cameraStatus = document.createElement('span');
+    cameraStatus.className = 'camera-status';
+    cameraStatus.textContent = state.videoEnabled ? 'VID ON' : 'VID OFF';
+    cameraStatus.setAttribute('data-status', state.videoEnabled ? 'on' : 'off');
+    cameraStatus.style.color = state.videoEnabled ? '#0f0' : '#f00'; // Green for ON, Red for OFF
+    cameraStatus.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    cameraStatus.style.padding = '2px 6px';
+    cameraStatus.style.borderRadius = '3px';
 
-    // Mic icon
-    const micIcon = document.createElement('div');
-    micIcon.className = 'mic-icon';
-    micIcon.style.cssText = `
-      width: 36px !important;
-      height: 36px !important;
-      border-radius: 50% !important;
-      background: rgba(0, 0, 0, 0.7) !important;
-      display: flex !important;
-      align-items: center !important;
-      justify-content: center !important;
-      font-size: 18px !important;
-      transition: none !important;
-    `;
-    micIcon.innerHTML = '🎤'; // Default: mic on
-    micIcon.setAttribute('data-status', 'on');
+    // Mic status span - use ACTUAL state
+    const micStatus = document.createElement('span');
+    micStatus.className = 'mic-status';
+    micStatus.textContent = state.audioEnabled ? 'MIC ON' : 'MIC OFF';
+    micStatus.setAttribute('data-status', state.audioEnabled ? 'on' : 'off');
+    micStatus.style.color = state.audioEnabled ? '#0f0' : '#f00'; // Green for ON, Red for OFF
+    micStatus.style.backgroundColor = 'rgba(0, 0, 0, 0.7)';
+    micStatus.style.padding = '2px 6px';
+    micStatus.style.borderRadius = '3px';
 
-    iconsContainer.appendChild(cameraIcon);
-    iconsContainer.appendChild(micIcon);
+    iconsContainer.appendChild(cameraStatus);
+    iconsContainer.appendChild(micStatus);
     container.appendChild(iconsContainer);
 
-    console.log(`[_createStatusIcons] ✅ Created status icons for ${attendeeId.substring(0, 8)}...`);
+    console.log(`[_createStatusIcons] ✅ Created status icons for ${attendeeId.substring(0, 8)}... with ACTUAL state`, {
+      iconsAdded: container.querySelector('.status-icons') !== null,
+      position: iconsContainer.style.position,
+      zIndex: iconsContainer.style.zIndex,
+      videoState: state.videoEnabled ? 'ON' : 'OFF',
+      audioState: state.audioEnabled ? 'ON' : 'OFF'
+    });
   }
 
   /* ====================================================================
@@ -2564,52 +2930,63 @@ class chimeHandler {
   static _updateStatusIcons(attendeeId, status) {
     const containers = document.querySelectorAll(`[data-attendee-id="${attendeeId}"]`);
     
+    let processedCount = 0;
+    let ghostCount = 0;
+    
     containers.forEach(container => {
-      const video = container.querySelector('video');
-      if (!video) return; // Skip ghost containers
+      // SKIP ghost containers (no video element) to prevent duplicates
+      const hasVideo = container.querySelector('video');
+      if (!hasVideo) {
+        ghostCount++;
+        // CLEAN UP: Remove status icons from ghost containers
+        const ghostIcons = container.querySelector('.status-icons');
+        if (ghostIcons) {
+          console.log(`[_updateStatusIcons] 🗑️ Removing duplicate status icons from ghost container (ID: ${container.id || 'none'})`);
+          ghostIcons.remove();
+        }
+        return; // Skip this ghost container
+      }
       
+      // Find status icons - works in both video and avatar views
       let iconsContainer = container.querySelector('.status-icons');
       
-      // Create icons if they don't exist
+      // Create icons if they don't exist (only for real containers with video)
       if (!iconsContainer) {
+        console.log(`[_updateStatusIcons] Creating missing status icons for ${attendeeId.substring(0,8)}... in container ${container.id || 'no-id'}`);
         this._createStatusIcons(container, attendeeId);
         iconsContainer = container.querySelector('.status-icons');
       }
       
-      if (!iconsContainer) return;
-      
-      const cameraIcon = iconsContainer.querySelector('.camera-icon');
-      const micIcon = iconsContainer.querySelector('.mic-icon');
-      
-      // Update camera icon
-      if (status.videoEnabled !== undefined && cameraIcon) {
-        if (status.videoEnabled) {
-          cameraIcon.innerHTML = '📹';
-          cameraIcon.style.background = 'rgba(34, 197, 94, 0.9)'; // Green
-          cameraIcon.setAttribute('data-status', 'on');
-        } else {
-          cameraIcon.innerHTML = '📹';
-          cameraIcon.style.background = 'rgba(239, 68, 68, 0.9)'; // Red
-          cameraIcon.style.textDecoration = 'line-through';
-          cameraIcon.setAttribute('data-status', 'off');
-        }
+      if (!iconsContainer) {
+        console.warn(`[_updateStatusIcons] Could not find or create status icons for ${attendeeId.substring(0,8)}...`);
+        return;
       }
       
-      // Update mic icon
-      if (status.audioEnabled !== undefined && micIcon) {
-        if (status.audioEnabled) {
-          micIcon.innerHTML = '🎤';
-          micIcon.style.background = 'rgba(34, 197, 94, 0.9)'; // Green
-          micIcon.style.textDecoration = 'none';
-          micIcon.setAttribute('data-status', 'on');
-        } else {
-          micIcon.innerHTML = '🎤';
-          micIcon.style.background = 'rgba(239, 68, 68, 0.9)'; // Red
-          micIcon.style.textDecoration = 'line-through';
-          micIcon.setAttribute('data-status', 'off');
-        }
+      processedCount++;
+      
+      const cameraStatus = iconsContainer.querySelector('.camera-status');
+      const micStatus = iconsContainer.querySelector('.mic-status');
+      
+      // Update camera status text and color
+      if (status.videoEnabled !== undefined && cameraStatus) {
+        cameraStatus.textContent = status.videoEnabled ? 'VID ON' : 'VID OFF';
+        cameraStatus.setAttribute('data-status', status.videoEnabled ? 'on' : 'off');
+        cameraStatus.style.color = status.videoEnabled ? '#0f0' : '#f00'; // Green for ON, Red for OFF
+        console.log(`[_updateStatusIcons] Video updated: ${status.videoEnabled ? 'ON' : 'OFF'}`);
+      }
+      
+      // Update mic status text and color
+      if (status.audioEnabled !== undefined && micStatus) {
+        micStatus.textContent = status.audioEnabled ? 'MIC ON' : 'MIC OFF';
+        micStatus.setAttribute('data-status', status.audioEnabled ? 'on' : 'off');
+        micStatus.style.color = status.audioEnabled ? '#0f0' : '#f00'; // Green for ON, Red for OFF
+        console.log(`[_updateStatusIcons] Audio updated: ${status.audioEnabled ? 'ON' : 'OFF'}`);
       }
     });
+    
+    if (ghostCount > 0) {
+      console.log(`[_updateStatusIcons] ✅ Processed ${processedCount} real containers, cleaned up ${ghostCount} ghost containers for ${attendeeId.substring(0,8)}...`);
+    }
   }
 
   /* ====================================================================
@@ -2627,7 +3004,7 @@ class chimeHandler {
     overlay.className = "debug-overlay";
     overlay.style.position = "absolute";
     overlay.style.top = "5px";
-    overlay.style.left = "5px";
+    overlay.style.left = "5px"; // Position in top-left
     overlay.style.right = "auto"; // Don't stretch, let content determine width
     overlay.style.maxWidth = "calc(100% - 10px)"; // Prevent overflow
     overlay.style.backgroundColor = "rgba(0, 0, 0, 0.8)";
@@ -2690,12 +3067,12 @@ class chimeHandler {
     if (userRole === "guest") userRole = "attendee";
     if (userRole === "collab") userRole = "collaborator";
 
-    const displayName = userData?.displayName || userData?.username || "Unknown";
+    const displayName = userData?.displayName || userData?.username || "";
     const userId = userData?.userId || attendeeId.substring(0, 8);
-    const roleDisplay = userRole ? `${userRole.toUpperCase()}` : "UNKNOWN";
+    const roleDisplay = userRole ? `${userRole.toUpperCase()}` : "ATTENDEE";
 
     overlay.innerHTML = `
-      <div><strong>${displayName}</strong> [${roleDisplay}]</div>
+      <div><strong>${displayName ? displayName : roleDisplay}</strong> [${roleDisplay}]</div>
       <div>ID: ${userId}</div>
       <div>Attendee: ${attendeeId.substring(0, 12)}...</div>
       <div>Tile: ${tileId}</div>
@@ -2706,14 +3083,17 @@ class chimeHandler {
 
     container.appendChild(overlay);
     
-    // Initialize with default ON status after 1 second (assume enabled unless told otherwise)
-    setTimeout(() => {
+    // Initialize with ACTUAL state from _attendeeStates Map (immediate, no delay to prevent bounce)
+    // Use requestAnimationFrame instead of setTimeout to sync with browser paint cycle
+    requestAnimationFrame(() => {
+      const actualState = this._attendeeStates.get(attendeeId) || { videoEnabled: false, audioEnabled: false };
+      console.log(`[_createDebugOverlay] Reading LATEST state for ${attendeeId.substring(0,8)}... immediately:`, actualState);
       this._updateDebugOverlay(attendeeId, { 
-        audioEnabled: true, 
-        videoEnabled: true, 
+        audioEnabled: actualState.audioEnabled, 
+        videoEnabled: actualState.videoEnabled, 
         connectionStrength: 'Good' 
       });
-    }, 1000);
+    });
     
     return overlay;
   }
@@ -3274,6 +3654,56 @@ class chimeHandler {
       "data-attendee-id": targetContainer.getAttribute("data-attendee-id"),
       classes: targetContainer.className,
     });
+
+    // ===================================================================
+    // IMMEDIATELY CREATE OVERLAYS ON CONTAINER (BEFORE VIDEO APPEARS)
+    // This ensures debug data and status icons are visible from the start
+    // ===================================================================
+    const computedPos = window.getComputedStyle(targetContainer).position;
+    if (computedPos === "static") {
+      targetContainer.style.position = "relative";
+    }
+
+    // Set initial state BEFORE creating icons ONLY if not already set
+    // (video tile may have already set the correct state)
+    if (!this._attendeeStates.has(attendeeId)) {
+      // Read actual join settings from window.settings (what user actually joined with)
+      const initialVideoState = window.settings?.callCamStatus ?? false;
+      const initialAudioState = window.settings?.callMicStatus ?? false;
+      this._attendeeStates.set(attendeeId, { videoEnabled: initialVideoState, audioEnabled: initialAudioState });
+      console.log(`[UiMapTileToCard] Set initial state for ${attendeeId.substring(0,8)}... from join settings`, { 
+        videoEnabled: initialVideoState, 
+        audioEnabled: initialAudioState,
+        source: 'window.settings (actual join state)'
+      });
+    } else {
+      console.log(`[UiMapTileToCard] State already exists for ${attendeeId.substring(0,8)}...`, this._attendeeStates.get(attendeeId));
+    }
+
+    // Create debug overlay (top-right position)
+    if (!targetContainer.querySelector('.debug-overlay')) {
+      console.log(`[UiMapTileToCard] Creating debug overlay for ${attendeeId.substring(0,8)}... immediately`);
+      this._createDebugOverlay(targetContainer, 0, attendeeId); // tileId=0 for now, will update when video appears
+    }
+
+    // Create VIDEO OFF indicator (shown by default until video appears)
+    if (!targetContainer.querySelector('.video-off-indicator')) {
+      console.log(`[UiMapTileToCard] Creating video-off indicator for ${attendeeId.substring(0,8)}... immediately`);
+      this._createVideoOffIndicator(targetContainer, attendeeId);
+      // Show it by default (will be hidden when video appears)
+      const indicator = targetContainer.querySelector('.video-off-indicator');
+      if (indicator) {
+        indicator.style.display = 'flex';
+      }
+    }
+
+    // Create status icons (always visible)
+    if (!targetContainer.querySelector('.status-icons')) {
+      console.log(`[UiMapTileToCard] Creating status icons for ${attendeeId.substring(0,8)}... immediately`);
+      this._createStatusIcons(targetContainer, attendeeId);
+    }
+
+    console.log(`[UiMapTileToCard] ✅ All overlays created immediately for ${attendeeId.substring(0,8)}...`);
 
     // Find existing video element for this attendee and move it to target container
     const existingVideo = document.querySelector(
@@ -3973,6 +4403,24 @@ class chimeHandler {
 window.addEventListener("DOMContentLoaded", () => {
   console.log("[chimeHandler] DOMContentLoaded - initializing");
   chimeHandler.init();
+  
+  // Clean up any orphaned/duplicate status icons on page load
+  setTimeout(() => {
+    const allStatusIcons = document.querySelectorAll('.status-icons');
+    let removedCount = 0;
+    allStatusIcons.forEach(icons => {
+      // Remove status icons that are in ghost containers (no video sibling)
+      const container = icons.closest('[data-attendee-id]');
+      if (container && !container.querySelector('video')) {
+        console.log(`[chimeHandler] 🧹 Cleaning up orphaned status icons from ghost container (ID: ${container.id || 'none'})`);
+        icons.remove();
+        removedCount++;
+      }
+    });
+    if (removedCount > 0) {
+      console.log(`[chimeHandler] ✅ Cleaned up ${removedCount} orphaned status icon containers`);
+    }
+  }, 1000); // Run after page is fully loaded
 
   // Expose clean API functions to browser console
   window.createScyllaMeeting =

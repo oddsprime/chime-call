@@ -13,6 +13,7 @@
       toggleMicrophone: { type: Function, required: false },
       chimeCallSettings: { type: Object, required: false },
     },
+    emits: ['end-call'],
     components: (function () {
       const comps = {};
       const vc = window.VueComponents || {};
@@ -39,6 +40,19 @@
       }
       return comps;
     })(),
+    mounted() {
+      // When component mounts, trigger video preview sync if master video has stream
+      // This ensures video elements that mount after initial sync get the stream
+      this.$nextTick(() => {
+        if (window.CamMicPermissionsHandler && typeof window.CamMicPermissionsHandler._syncMultipleVideoPreviews === 'function') {
+          // Small delay to ensure DOM is fully ready
+          setTimeout(() => {
+            console.log('[TemplateChimeCalleeConnected] [mounted] Triggering video preview sync');
+            window.CamMicPermissionsHandler._syncMultipleVideoPreviews();
+          }, 150);
+        }
+      });
+    },
     methods: {
       handleJoinClick() {
         let dispatchedUiState = false;
@@ -102,15 +116,10 @@
                       <video autoplay="" playsinline="" data-local="" style="width: 100%; background: rgb(0, 0, 0);"></video>
                       <div class="text-[0.75rem] opacity-90 max-w-[32.5rem]" data-status-self=""></div>
                     </div>
-                  </div>
-                 
+                  </div> 
                  
                   <!--<video data-cm-video-preview="" class="w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>-->
  <video data-cam-mic-element="video-preview" class="absolute w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>
-
-
-
-
 
                   <connecting-section :show="substate === 'connecting'"></connecting-section>
                 </div>
@@ -119,7 +128,17 @@
               <back-button :show="substate !== 'connecting'"></back-button>
               <div class="flex flex-col lg:flex-row z-10 gap-2 justify-between left-0 right-0 lg:rounded-none rounded-full items-center lg:relative absolute bottom-4 lg:bottom-0 lg:w-full w-full lg:mx-0 px-4 md:!px-0 py-0">
                 <bottom-left-info :user-initials="userInitials" />
-                <div class="flex items-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 md:w-[calc(100%-424px)] sm:w-full">
+                <div class="flex items-center justify-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
+                  
+                <div v-if="chimeCallSettings && !chimeCallSettings.callCamStatus" class="tooltip-wrapper bg-white/70 flex justify-center absolute top-[-70px] w-[34.0rem] rounded-xl px-3 py-2
+                    after:content-[''] after:absolute after:bottom-[-1.6rem] after:left-1/2 after:-translate-x-1/2
+                    after:border-8 after:border-transparent after:border-t-white/70"
+                >
+                    <div class="always-visible-tooltip text-[#101828] text-center font-poppins text-[1.2rem] font-medium leading-[1.8rem]" >
+                        It looks like your camera and mic are off. Turn them on for a smoother,
+                        more engaging experience!
+                    </div>
+                </div>
                   <camera-mic-controls :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" :chime-call-settings="chimeCallSettings"/>
                 </div>
                 <div class="w-1/3"></div>

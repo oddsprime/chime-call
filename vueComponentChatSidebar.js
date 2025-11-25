@@ -12,10 +12,15 @@ const ChatSidebar = defineComponent({
   },
   props: {
     toggleChat: { type: Function, required: false },
-    isCreator: {type: Boolean, default: false }
+  },
+  computed: {
+    currentRole() {
+      if (!window.settings) return '';
+      return window.settings.userType || '';
+    },
   },
   template: `
-    <div class="chat-sidebar-wrapper h-full bg-black/10">
+    <div data-chat-siderbar id="chat-siderbar" class="chat-sidebar-wrapper relative h-full bg-black/50 lg:rounded-[10px] overflow-y-auto lg:w-[40rem]">
       <!-- Chat Panel - Always Visible -->
       <aside data-sidebar-pannel id="chatPanel" class="lg:w-40 h-full sm:h-screen lg:h-full md:h-screen relative overflow-y-auto g-2  shadow-control w-full backdrop-blur-md flex flex-col">
         <div id="chat-section">
@@ -52,7 +57,7 @@ const ChatSidebar = defineComponent({
                     <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/send-03.svg" class="invert"/>
                   </button>
                 </div>
-                <div @click="setActivePanel('gift')">
+                <div v-show="currentRole === 'Creator'" @click="setActivePanel('gift')">
                   <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/gift-02.svg" id="giftToggleBtn" class="w-[24px] h-[24px] cursor-pointer" aria-label="Open gift menu">
                 </div>
 
@@ -65,7 +70,7 @@ const ChatSidebar = defineComponent({
                   </div>
                 </div>
                 <div>
-                  <div  v-if="!isCreator" id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
+                  <div v-show="currentRole === 'Creator'" id="plusMenuToggle" class="bg-brand-primary rounded-full h-[36px] w-[36px] flex items-center justify-center cursor-pointer">
                     <img class="w-[24px] h-[24px]" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">
                   </div>
 
@@ -99,16 +104,16 @@ const ChatSidebar = defineComponent({
       </aside>
 
       <!-- Gift Panel -->
-      <aside data-sidebar-pannel id="giftPanel" class="backdrop-blur-[25px] backdrop-blur-lg lg:h-full h-auto absolute bottom-0 left-0 w-full lg:w-[400px] bg-black/50 lg:rounded-card shadow-control flex-col justify-center items-center" v-show="meeting.activePanel === 'gift'">
+      <aside data-sidebar-pannel id="giftPanel" class="backdrop-blur-[25px] backdrop-blur-lg lg:h-full h-full absolute bottom-0 left-0 w-full lg:w-[400px] bg-black/50 lg:rounded-card shadow-control flex-col justify-center items-center" v-show="meeting.activePanel === 'gift'">
         <div class="flex flex-col justify-between h-full">
           <!-- Settings Header & Content -->
-          <div class="p-4 flex lg:bg-transparent flex-col gap-4 flex-1 w-full">
+          <div class="flex lg:bg-transparent flex-col gap-4 flex-1 w-full">
             <div class="flex flex-col gap-4">
               <div class="flex flex-col">
-                <div class=" flex items-center justify-between w-full">
+                <div class="p-4 flex items-center justify-between w-full">
+                  <div class="h-6 w-6"></div>
                   <div class="flex items-center gap-1">
-                    <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/gift-02-grey.svg" class="w-[16px] h-[16px] object-cover"/>
-                    <h3 class="text-gray-400 text-center font-medium text-[12px]">
+                    <h3 class="text-[#EAECF0] font-poppins text-base font-medium leading-">
                       Send gifts
                     </h3>
                   </div>
@@ -117,7 +122,7 @@ const ChatSidebar = defineComponent({
                   </div>
                 </div>
 
-                <div class="mt-4 grid md:grid-cols-8 lg:grid-cols-3 grid-cols-4 gap-4 lg:gap-2">
+                <div class="p-4 grid md:grid-cols-8 lg:grid-cols-3 grid-cols-4 gap-4 lg:gap-2">
                   <div class="cursor-pointer h-[120px] p-2 flex flex-col justify-center items-center">
                     <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/pngs/gift-icon-1.png" class="w-[76px] h-[76px] object-cover">
                     <div class="flex items-center mt-2 gap-2">
@@ -131,8 +136,8 @@ const ChatSidebar = defineComponent({
             </div>
           </div>
           <!-- Default Footer: Add Custom Gift -->
-          <div v-if="!isCreator" id="giftFooterDefault" class="px-4 py-2 w-full">
-            <div class="btn w-full">
+          <div id="giftFooterDefault" class="p-4 w-full">
+            <div class="w-full">
               <button class="flex px-4 py-[10px] flex justify-center items-center rounded-full w-full bg-brand-primary">
                 <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/plus.svg" alt="">
                 <p class="font-semibold text-gray-950  text-base">Add Custom Gift </p>

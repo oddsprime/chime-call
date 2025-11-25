@@ -19,7 +19,7 @@
         >
           <img
             src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/settings-02.svg"
-            class="w-8 h-8 invert brightness-0"
+            class="w-[2.2rem] h-[2.2rem] invert brightness-0"
             alt="Settings"
           />
         </div>

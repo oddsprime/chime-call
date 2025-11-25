@@ -7,12 +7,25 @@
         chimeCallSettings: { type: Object, required: false },
       },
       template: `
-      <camera-button :enabled="chimeCallSettings.callCamStatus" @toggle="toggleCamera" />
+      <camera-button 
+        :enabled="chimeCallSettings.callCamStatus" 
+        @toggle="toggleCamera" 
+        button-size-classes="w-12 lg:w-17 h-12 lg:h-17"
+        icon-size-classes="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
+      />
       <settings-trigger @toggle="onToggleSettings"></settings-trigger>
       <microphone-button
         :enabled="chimeCallSettings.callMicStatus"
         @toggle="toggleMicrophone"
+        button-size-classes="w-12 lg:w-17 h-12 lg:h-17"
+        icon-size-classes="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
       />
+       <end-call-button
+        :icon="endCallIcon"
+        btn-size="w-12 lg:w-17 h-12 lg:h-17"
+        img-size="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
+        @click="$emit('end-call')"
+      ></end-call-button>
   `
     });
   }

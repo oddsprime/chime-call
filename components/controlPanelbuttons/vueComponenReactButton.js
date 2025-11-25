@@ -100,7 +100,7 @@
       template: `
           <div 
             :class="[
-              'h-[68px] w-[68px] rounded-full flex items-center justify-center cursor-pointer transition-colors duration-200',
+              'w-12 lg:w-17 h-12 lg:h-17 rounded-full flex items-center justify-center cursor-pointer transition-colors duration-200',
               isActive ? 'bg-white/75' : 'bg-white/10'
             ]" 
             aria-label="Toggle reaction"
@@ -109,7 +109,7 @@
             <img 
               src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/smile-emoji.svg" 
               :class="[
-                'w-8 h-8 transition duration-200 ease-out',
+                'w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8 transition duration-200 ease-out',
                 isActive ? 'filter invert' : ''
               ]"
               alt="Emoji"

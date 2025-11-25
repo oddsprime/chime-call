@@ -5,7 +5,7 @@
  * - Console logs EVERYWHERE (direct console.log).
  * - NO fallbacks (no "||" defaults).
  * - Instant one-on-one ONLY.
- * - 25s timeout ENDS THE FLOW FOR BOTH SIDES.
+ * - 2min (120s) timeout ENDS THE FLOW FOR BOTH SIDES (for slow internet).
  * - meeting:ready includes {callerRole, calleeRole}; each side joins with its role.
  * - call:ringing is LOCAL-ONLY (no socket listener).
  * - On incoming, the callee/target IDs/roles come from SOCKET body (not from inputs).
@@ -24,13 +24,381 @@ class CallHandler {
   static _currentUISubstate = null;
   static _lastDispatchTime = 0;
   static _duplicateThrottleMs = 50; // Only skip if duplicate within 50ms
+  static _isCallTerminated = false; // Persistent flag - survives popup close
+  
+  /* === CALL ID TRACKING === */
+  static _currentCallId = null; // Current active call ID
+  static _terminatedCallIds = new Set(); // Set of terminated call IDs
+  
+  /* === CAMMIC INITIALIZATION === */
+  static _camMicInitialized = false; // Track if CamMic has been initialized (first call only)
+  
+  /* === API ABORT CONTROL === */
+  static _apiAbortController = null; // AbortController for canceling in-flight API requests
+  
+  /* === CAM/MIC PERMISSION FLOW === */
+  static _camMicPermissionShownForCallId = null; // Guard: only show once per call
+  static _nextStateAfterCamMicPermissions = null; // Store where to go after grant
+  static _camMicPermissionTimer = null; // 20s timer for permission delay
+  
+  /* === BLOCKLIST === */
+  static _blockedUserIds = new Set(); // Permanent blocked user IDs
+  static _temporaryBlockedUsers = new Map(); // userId -> expiry timestamp
+  static BLOCK_DURATION_HOURS = 24; // Temporary block duration
+  static BLOCKED_USERS_KEY = 'chime_blocked_users'; // localStorage key for permanent blocks
+  static TEMPORARY_BLOCKS_KEY = 'chime_temporary_blocks'; // localStorage key for temporary blocks
 
   /* === STATE RESET === */
-  static resetUIState() {
-    console.log('[UI] Resetting UI state tracking (call ended)');
+  static resetUIState(clearTerminated = false) {
+    console.log('[UI] Resetting UI state tracking (call ended)', { clearTerminated });
     CallHandler._currentUIState = null;
     CallHandler._currentUISubstate = null;
     CallHandler._lastDispatchTime = 0;
+    if (clearTerminated) {
+      console.log('[UI] Clearing terminated flag - new call starting');
+      CallHandler._isCallTerminated = false;
+    }
+  }
+
+  /* === CAMMIC INITIALIZATION === */
+  static _ensureCamMicInitialized() {
+    if (!CallHandler._camMicInitialized) {
+      console.log('%c[CamMic] 🚀 Initializing CamMic permissions system (first call)', 'background: #17a2b8; color: white; font-weight: bold; padding: 5px;');
+      window.dispatchEvent(new CustomEvent('CamMic:Init'));
+      CallHandler._camMicInitialized = true;
+      console.log('%c[CamMic] ✅ CamMic initialized - will not initialize again for subsequent calls', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+    } else {
+      console.log('%c[CamMic] ⏭️ CamMic already initialized - skipping', 'background: #6c757d; color: white; font-weight: bold; padding: 5px;');
+    }
+  }
+
+  /* === CLEANUP FOR NEW CALL === */
+  static _cleanupForNewCall(newCallId, reason) {
+    console.log('%c[CLEANUP] 🧹 Starting cleanup for new call', 'background: #ff6b6b; color: white; font-weight: bold; padding: 5px;', {
+      newCallId,
+      reason,
+      previousCallId: CallHandler._currentCallId
+    });
+    
+    // 1. Abort any pending API requests
+    if (CallHandler._apiAbortController) {
+      console.log('%c[CLEANUP] ❌ Aborting previous API requests', 'background: #ff6b6b; color: white; padding: 5px;');
+      try {
+        CallHandler._apiAbortController.abort();
+      } catch (err) {
+        console.warn('[CLEANUP] Error aborting API requests:', err);
+      }
+      CallHandler._apiAbortController = null;
+    }
+    
+    // 2. Force leave Chime meeting if call ID changed
+    if (CallHandler._currentCallId && CallHandler._currentCallId !== newCallId) {
+      console.log('%c[CLEANUP] 🚪 Force leaving Chime meeting (call ID changed)', 'background: #ff6b6b; color: white; padding: 5px;', {
+        oldCallId: CallHandler._currentCallId,
+        newCallId
+      });
+      
+      if (typeof coreChime !== 'undefined' && typeof coreChime.leave === 'function') {
+        try {
+          coreChime.leave(reason || 'New call starting');
+        } catch (err) {
+          console.warn('[CLEANUP] Error leaving Chime:', err);
+        }
+      }
+    }
+    
+    // 3. Reset invite data
+    console.log('%c[CLEANUP] 📋 Resetting invite data', 'background: #ff6b6b; color: white; padding: 5px;');
+    CallHandler._invite = {
+      callerId: null,
+      calleeId: null,
+      callerRole: null,
+      callType: null,
+      callerData: null,
+      calleeData: null,
+    };
+    
+    // 4. Clear user data
+    console.log('%c[CLEANUP] 👤 Clearing user data', 'background: #ff6b6b; color: white; padding: 5px;');
+    CallHandler._currentUserData = null;
+    CallHandler._targetUserData = null;
+    
+    // 5. Clear pending callee join info
+    CallHandler._pendingCalleeJoin = null;
+    
+    // 6. Reset chimeHandler alert flags
+    if (typeof chimeHandler !== 'undefined') {
+      console.log('%c[CLEANUP] 🔔 Resetting chimeHandler alert flags', 'background: #ff6b6b; color: white; padding: 5px;');
+      chimeHandler._hasShownJoinedAlert = false;
+      chimeHandler._hasShownConnectedAlert = false;
+      chimeHandler._hasShownInCallAlert = false;
+    }
+    
+    // 7. Reset Vue callSettings if available
+    if (typeof window !== 'undefined' && window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
+      console.log('%c[CLEANUP] ⚙️ Resetting Vue callSettings', 'background: #ff6b6b; color: white; padding: 5px;');
+      try {
+        window.vueApp.resetCallSettings();
+      } catch (err) {
+        console.warn('[CLEANUP] Error resetting Vue callSettings:', err);
+      }
+    }
+    
+    // 8. Clear UI state if needed (but keep terminated flag for proper flow)
+    CallHandler._currentUIState = null;
+    CallHandler._currentUISubstate = null;
+    CallHandler._lastDispatchTime = 0;
+    
+    console.log('%c[CLEANUP] ✅ Cleanup complete', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+  }
+
+  /* === COMPLETE STATE CLEAR === */
+  static clearAllCallState() {
+    console.log('%c[STATE CLEAR] 🧹 Clearing all call-related state', 'background: #6c757d; color: white; font-weight: bold; padding: 5px;');
+    
+    // Clear UI state
+    CallHandler.resetUIState(true);
+    
+    // Clear call ID
+    CallHandler._currentCallId = null;
+    
+    // Clear invite data (database IDs, meeting info, etc.)
+    CallHandler._invite = {
+      callerId: null,
+      calleeId: null,
+      callerRole: null,
+      callType: null,
+      callerData: null,
+      calleeData: null,
+    };
+    
+    // Clear pending callee join info
+    CallHandler._pendingCalleeJoin = null;
+    
+    // Clear user data
+    CallHandler._currentUserData = null;
+    CallHandler._targetUserData = null;
+    
+    // Clear side tracking
+    CallHandler._currentSide = null;
+    
+    // Clear in-call flag
+    CallHandler._inCallOrConnecting = false;
+    
+    // Clear timers
+    if (CallHandler._calleeRingTimerId) {
+      clearTimeout(CallHandler._calleeRingTimerId);
+      CallHandler._calleeRingTimerId = null;
+    }
+    if (CallHandler._callerRingTimerId) {
+      clearTimeout(CallHandler._callerRingTimerId);
+      CallHandler._callerRingTimerId = null;
+    }
+    if (CallHandler._callerGraceTimerId) {
+      clearTimeout(CallHandler._callerGraceTimerId);
+      CallHandler._callerGraceTimerId = null;
+    }
+    
+    // Clear mockCallData state if it exists
+    if (window.mockCallData) {
+      window.mockCallData.isInGrace = false;
+      // Note: We don't clear all mockCallData as it may contain persistent user info
+    }
+    
+    console.log('%c[STATE CLEAR] ✅ All call state cleared', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+  }
+  
+  /* === CALL ID METHODS === */
+  static _generateCallId() {
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substr(2, 9);
+    return `call_${timestamp}_${random}`;
+  }
+  
+  static setCallId(callId) {
+    console.log(`%c[CALL ID] Setting call ID: ${callId}`, 'background: #007bff; color: white; padding: 5px;');
+    CallHandler._currentCallId = callId;
+    // Clear terminated flag when new call ID is set
+    CallHandler._isCallTerminated = false;
+    return callId;
+  }
+  
+  static getCurrentCallId() {
+    return CallHandler._currentCallId;
+  }
+  
+  static isCallTerminated(callId) {
+    const isTerminated = CallHandler._terminatedCallIds.has(callId);
+    console.log(`%c[CALL ID] Checking if call ${callId} is terminated: ${isTerminated}`, 'background: #6c757d; color: white; padding: 3px;');
+    return isTerminated;
+  }
+  
+  static terminateCall(callId) {
+    console.log(`%c[CALL ID] Terminating call: ${callId}`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+    CallHandler._terminatedCallIds.add(callId);
+    CallHandler._isCallTerminated = true;
+  }
+  
+  /* === BLOCKLIST METHODS === */
+  static _loadBlocklistFromStorage() {
+    try {
+      // Load permanent blocks
+      const permanentBlocks = localStorage.getItem(CallHandler.BLOCKED_USERS_KEY);
+      if (permanentBlocks) {
+        const blockedArray = JSON.parse(permanentBlocks);
+        CallHandler._blockedUserIds = new Set(blockedArray);
+        console.log(`[BLOCKLIST] Loaded ${blockedArray.length} permanent blocks from localStorage`);
+      }
+      
+      // Load temporary blocks
+      const temporaryBlocks = localStorage.getItem(CallHandler.TEMPORARY_BLOCKS_KEY);
+      if (temporaryBlocks) {
+        const tempBlocksObj = JSON.parse(temporaryBlocks);
+        CallHandler._temporaryBlockedUsers = new Map(Object.entries(tempBlocksObj));
+        console.log(`[BLOCKLIST] Loaded ${CallHandler._temporaryBlockedUsers.size} temporary blocks from localStorage`);
+      }
+      
+      // Clean expired blocks
+      CallHandler._cleanExpiredBlocks();
+    } catch (error) {
+      console.error('[BLOCKLIST] Error loading blocklist from localStorage:', error);
+    }
+  }
+  
+  static _saveBlocklistToStorage() {
+    try {
+      // Save permanent blocks
+      const permanentArray = Array.from(CallHandler._blockedUserIds);
+      localStorage.setItem(CallHandler.BLOCKED_USERS_KEY, JSON.stringify(permanentArray));
+      
+      // Save temporary blocks
+      const tempBlocksObj = Object.fromEntries(CallHandler._temporaryBlockedUsers);
+      localStorage.setItem(CallHandler.TEMPORARY_BLOCKS_KEY, JSON.stringify(tempBlocksObj));
+      
+      console.log(`[BLOCKLIST] Saved blocklist to localStorage (${permanentArray.length} permanent, ${CallHandler._temporaryBlockedUsers.size} temporary)`);
+    } catch (error) {
+      console.error('[BLOCKLIST] Error saving blocklist to localStorage:', error);
+    }
+  }
+  
+  static _cleanExpiredBlocks() {
+    const now = Date.now();
+    let expiredCount = 0;
+    
+    for (const [userId, expiry] of CallHandler._temporaryBlockedUsers.entries()) {
+      if (now > expiry) {
+        CallHandler._temporaryBlockedUsers.delete(userId);
+        expiredCount++;
+      }
+    }
+    
+    if (expiredCount > 0) {
+      console.log(`[BLOCKLIST] Cleaned ${expiredCount} expired temporary blocks`);
+      CallHandler._saveBlocklistToStorage();
+    }
+  }
+  
+  static isUserBlocked(userId) {
+    if (!userId) return false;
+    
+    // Check permanent blocks
+    if (CallHandler._blockedUserIds.has(userId)) {
+      console.log(`%c[BLOCKLIST] 🚫 User ${userId} is permanently blocked`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      return true;
+    }
+    
+    // Check temporary blocks
+    const expiry = CallHandler._temporaryBlockedUsers.get(userId);
+    if (expiry) {
+      const now = Date.now();
+      if (now < expiry) {
+        const hoursRemaining = Math.ceil((expiry - now) / (1000 * 60 * 60));
+        console.log(`%c[BLOCKLIST] 🚫 User ${userId} is temporarily blocked (${hoursRemaining}h remaining)`, 'background: #ffc107; color: black; font-weight: bold; padding: 5px;');
+        return true;
+      } else {
+        // Expired, remove it
+        CallHandler._temporaryBlockedUsers.delete(userId);
+        CallHandler._saveBlocklistToStorage();
+      }
+    }
+    
+    return false;
+  }
+  
+  static blockUserPermanent(userId) {
+    if (!userId) {
+      console.warn('[BLOCKLIST] Cannot block - no user ID provided');
+      return false;
+    }
+    
+    console.log(`%c[BLOCKLIST] 🔨 Permanently blocking user: ${userId}`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+    CallHandler._blockedUserIds.add(userId);
+    // Remove from temporary blocks if present
+    CallHandler._temporaryBlockedUsers.delete(userId);
+    CallHandler._saveBlocklistToStorage();
+    
+    // #TODOLATER: Sync to database for multi-device support
+    CallHandler._syncBlocklistToDatabase(userId, 'permanent');
+    
+    return true;
+  }
+  
+  static blockUserTemporary(userId, hours = CallHandler.BLOCK_DURATION_HOURS) {
+    if (!userId) {
+      console.warn('[BLOCKLIST] Cannot block - no user ID provided');
+      return false;
+    }
+    
+    const expiry = Date.now() + (hours * 60 * 60 * 1000);
+    console.log(`%c[BLOCKLIST] ⏰ Temporarily blocking user: ${userId} for ${hours} hours`, 'background: #ffc107; color: black; font-weight: bold; padding: 5px;');
+    CallHandler._temporaryBlockedUsers.set(userId, expiry);
+    CallHandler._saveBlocklistToStorage();
+    
+    // #TODOLATER: Sync to database for multi-device support
+    CallHandler._syncBlocklistToDatabase(userId, 'temporary', { hours, expiry });
+    
+    return true;
+  }
+  
+  static unblockUser(userId) {
+    if (!userId) {
+      console.warn('[BLOCKLIST] Cannot unblock - no user ID provided');
+      return false;
+    }
+    
+    console.log(`%c[BLOCKLIST] ✅ Unblocking user: ${userId}`, 'background: #28a745; color: white; padding: 5px;');
+    const wasBlocked = CallHandler._blockedUserIds.delete(userId) || CallHandler._temporaryBlockedUsers.delete(userId);
+    
+    if (wasBlocked) {
+      CallHandler._saveBlocklistToStorage();
+      // #TODOLATER: Sync to database for multi-device support
+      CallHandler._syncBlocklistToDatabase(userId, 'unblock');
+    }
+    
+    return wasBlocked;
+  }
+  
+  static _syncBlocklistToDatabase(userId, type, metadata = {}) {
+    // #TODOLATER: Implement database sync for multi-device support
+    console.log(`[BLOCKLIST] #TODOLATER: Sync to database`, { userId, type, metadata });
+    // Future implementation:
+    // - Call API endpoint to sync blocklist
+    // - Handle multi-device scenarios
+    // - Sync on login/app start
+  }
+  
+  static getBlockedUsers() {
+    const permanent = Array.from(CallHandler._blockedUserIds);
+    const temporary = [];
+    
+    for (const [userId, expiry] of CallHandler._temporaryBlockedUsers.entries()) {
+      const hoursRemaining = Math.ceil((expiry - Date.now()) / (1000 * 60 * 60));
+      if (hoursRemaining > 0) {
+        temporary.push({ userId, hoursRemaining, expiry });
+      }
+    }
+    
+    return { permanent, temporary };
   }
 
   /* === ONLY ADDITION: single UI dispatcher (exact name requested) === */
@@ -38,12 +406,51 @@ class CallHandler {
  * SINGLE UI DISPATCHER (with extra logging and smart duplicate prevention)
  * ====================================================================== */
 static dipatchUI(state, substate = "none", payload = {}) {
-  console.log("[UI] dispatch requested", {
+  console.log(`%c[UI STATE] Dispatch requested: ${state} / ${substate}`, 'background: #00f; color: #fff; font-weight: bold; padding: 5px', {
     gotCallHandler: typeof CallHandler !== "undefined",
     state,
     substate,
-    payloadType: typeof payload,
+    payload,
+    stackTrace: new Error().stack
   });
+
+  // GUARD: Block all state transitions after call is terminated (persistent check)
+  // BUT: Always allow incoming call states and new call initiation (new calls should be able to start)
+  const isIncomingCallState = state === 'callee:incomingVideoCall' || state === 'callee:incomingAudioCall';
+  const isNewCallInitiation = state === 'caller:callWaiting'; // Allow new calls to start
+  
+  const isTerminated = CallHandler._isCallTerminated || (CallHandler._currentUIState && (
+    CallHandler._currentUIState.includes('terminated') ||
+    CallHandler._currentUIState.includes('rejected') ||
+    CallHandler._currentUIState.includes('declined') ||
+    CallHandler._currentUIState === 'ended'
+  ));
+  
+  const isNewStateTerminated = state.includes('terminated') || 
+                               state.includes('rejected') || 
+                               state.includes('declined') || 
+                               state === 'ended';
+  
+  // If already terminated, block any new state transitions (except setting terminated itself, incoming calls, or new call initiation)
+  if (isTerminated && !isNewStateTerminated && !isIncomingCallState && !isNewCallInitiation) {
+    console.log(`%c[UI STATE] 🚫 BLOCKED state transition - call already terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+      isCallTerminated: CallHandler._isCallTerminated,
+      currentState: CallHandler._currentUIState,
+      attemptedState: state,
+      substate,
+      stackTrace: new Error().stack
+    });
+    
+    if (typeof DebugLogger !== 'undefined') {
+      DebugLogger.addLog('terminated', 'CRITICAL', 'dipatchUI', `Blocked state transition to ${state} - call terminated`, {
+        isCallTerminated: CallHandler._isCallTerminated,
+        currentState: CallHandler._currentUIState,
+        attemptedState: state,
+        substate
+      });
+    }
+    return; // Block the state transition
+  }
 
   const now = Date.now();
   const timeSinceLastDispatch = now - CallHandler._lastDispatchTime;
@@ -53,39 +460,58 @@ static dipatchUI(state, substate = "none", payload = {}) {
   if (CallHandler._currentUIState === state && 
       CallHandler._currentUISubstate === substate && 
       timeSinceLastDispatch < CallHandler._duplicateThrottleMs) {
-    console.log(`[UI] ⏭️ SKIPPED duplicate dispatch: already in ${state} / ${substate} (dispatched ${timeSinceLastDispatch}ms ago)`);
+    console.log(`%c[UI STATE] ⏭️ SKIPPED duplicate dispatch: already in ${state} / ${substate} (dispatched ${timeSinceLastDispatch}ms ago)`, 'background: #888; color: #fff');
     return;
   }
 
   try {
     if (!document || !document.dispatchEvent) {
-      console.error("[UI] document.dispatchEvent not available");
+      console.error("[UI STATE] ❌ document.dispatchEvent not available");
       return;
     }
 
-    const detail = { state, substate, ts: Date.now(), ...payload };
+    // Include callType and mediaType in state dispatch for reactive access
+    // callType is always INSTANT_ONE_ON_ONE for instant calls
+    // mediaType comes from _invite.callType (which stores 'video' or 'audio')
+    const actualCallType = CallHandler.TYPE_INSTANT; // Always INSTANT_ONE_ON_ONE for instant calls
+    const mediaType = CallHandler._invite?.callType || (window.mockCallData?.mediaType) || null;
+    
+    const detail = { 
+      state, 
+      substate, 
+      ts: Date.now(),
+      ...payload,
+      // Add callType and mediaType to detail for reactive access (payload can override)
+      callType: payload.callType || actualCallType,
+      mediaType: payload.mediaType || mediaType
+    };
 
-    console.log("[UI] dispatching CustomEvent('chime-ui::state') with:", detail);
+    console.log(`%c[UI STATE] ✅ Dispatching: ${state} / ${substate}`, 'background: #0f0; color: #000; font-weight: bold', detail);
 
     document.dispatchEvent(
       new CustomEvent("chime-ui::state", { detail })
     );
 
     // Update state tracking
+    const previousState = CallHandler._currentUIState;
+    const previousSubstate = CallHandler._currentUISubstate;
     CallHandler._currentUIState = state;
     CallHandler._currentUISubstate = substate;
     CallHandler._lastDispatchTime = now;
 
-    console.log(`[UI] → ${state} / ${substate}`, detail);
+    console.log(`%c[UI STATE] State transition: ${previousState || '(none)'}/${previousSubstate || '(none)'} → ${state}/${substate}`, 'background: #ff0; color: #000; font-weight: bold');
     
-    // Auto-reset state tracking if call has ended
+    // Auto-set termination flag if call has ended (persistent - survives popup close)
     if (state.includes('terminated') || state.includes('rejected') || state.includes('declined') || state === 'ended') {
-      console.log('[UI] 🔄 Call ended - will reset state tracking for next call');
-      // Reset on next tick to allow current state to be processed
-      setTimeout(() => CallHandler.resetUIState(), 0);
+      console.log('%c[UI STATE] 🔄 Call ended - setting persistent termination flag', 'background: #f00; color: #fff');
+      CallHandler._isCallTerminated = true;
+      // Reset _inCallOrConnecting flag - we're no longer in a call
+      CallHandler._inCallOrConnecting = false;
+      // Don't auto-reset state - keep it so guard can check it
+      // State will be reset when new call explicitly starts
     }
   } catch (e) {
-    console.error("[UI] dispatch failed", e);
+    console.error("[UI STATE] ❌ dispatch failed", e);
   }
 }
 
@@ -94,6 +520,13 @@ static dipatchUI(state, substate = "none", payload = {}) {
   static TYPE_INSTANT = "INSTANT_ONE_ON_ONE";
   static TYPE_SCHEDULED = "SCHEDULED_ONE_ON_ONE";
   static TYPE_GROUP = "GROUP_ONE_ON_ONE";
+
+  static TERMINATION_REASONS = {
+    BUSY: 'Busy',
+    ON_ANOTHER_CALL: 'on_another_call',
+    NO_ANSWER: 'No Answer',
+    INSUFFICIENT_TOKENS: 'insufficient_tokens'
+  };
 
   static FLAGS = {
     CALL_INITIATE: "call:initiate",
@@ -117,31 +550,37 @@ static dipatchUI(state, substate = "none", payload = {}) {
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
       role: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     accept: {
       to: { type: "string", required: true },
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     decline: {
       to: { type: "string", required: true },
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
       reason: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     cancel: {
       to: { type: "string", required: true },
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     timeout: {
       to: { type: "string", required: true },
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     selfStop: {
       to: { type: "string", required: true },
       calleeId: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     meetingReady: {
       to: { type: "string", required: true },
@@ -150,6 +589,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
       calleeId: { type: "string", required: true },
       callerRole: { type: "string", required: true },
       calleeRole: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
     meetingProblem: {
       to: { type: "string", required: true },
@@ -157,6 +597,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
       callerId: { type: "string", required: true },
       calleeId: { type: "string", required: true },
       message: { type: "string", required: true },
+      callId: { type: "string", required: true },
     },
   };
 
@@ -174,12 +615,15 @@ static dipatchUI(state, substate = "none", payload = {}) {
     rejectReason: null,
   };
 
-  static _ringTimeoutMs = 25000;
+  static _ringTimeoutMs = 120000; // 2 minutes for slow internet connections
+  static _gracePeriodMs = 10000; // 10 seconds after timeout for caller to receive accepted
   static _calleeRingTimerId = null; // runs on receiver (incoming)
   static _callerRingTimerId = null; // runs on sender (after initiate)
+  static _callerGraceTimerId = null; // Grace period timer for caller
   static _inCallOrConnecting = false; // NEW: true when answered:setup/connecting or connected
   static _pendingCalleeJoin = null; // Store pending callee join info for manual join
   static _currentSide = null; // Track if we're the caller or callee for UI dispatches
+  static _isInCamMicWaiting = false; // Guard flag to prevent multiple transitions to waitingForCamMicPermissions state
 
   // Lambda API endpoints
   static _scyllaDatabaseEndpoint =
@@ -263,8 +707,14 @@ static dipatchUI(state, substate = "none", payload = {}) {
     document.addEventListener("app:call:start", CallHandler.handleAppStartCall);
     document.addEventListener(
       "app:call:accept",
-      CallHandler.handleAppAcceptCall
+      CallHandler.handleAcceptClick
     );
+    console.log("%c[CallHandler] Event listener registered for app:call:accept", 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+    document.addEventListener(
+      "app:call:terminate",
+      CallHandler.handleAppTerminateCall
+    );
+    console.log("%c[CallHandler] Event listener registered for app:call:terminate", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
     document.addEventListener(
       "app:call:reject",
       CallHandler.handleAppRejectCall
@@ -274,59 +724,161 @@ static dipatchUI(state, substate = "none", payload = {}) {
       CallHandler.handleAppCancelCall
     );
 
+    /* ====================================================================
+     * _guardTerminated(callback) - Guard wrapper for terminated state
+     * Wraps callbacks to ignore incoming messages when call is terminated
+     * Uses call ID to allow new calls even if previous call was terminated
+     * ==================================================================== */
+    CallHandler._guardTerminated = function(callback) {
+      return function(...args) {
+        const callbackName = callback.name || 'unknown';
+        const body = args[0] || {};
+        const callId = body.callId;
+        
+        // Always allow cancellation messages through - needed to terminate other side
+        const isCancellation = callbackName === 'handleSocketCancelled';
+        if (isCancellation) {
+          console.log(`%c[GUARD] ✅ Allowing cancellation message (always processed)`, 'background: #17a2b8; color: white; padding: 3px;', {
+            callback: callbackName,
+            callId: callId || 'none'
+          });
+          return callback.apply(this, args);
+        }
+        
+        // Always allow NEW incoming calls (call:initiate) - they have new call IDs
+        const isIncomingCall = callbackName === 'handleSocketIncomingCall';
+        if (isIncomingCall) {
+          // Check blocklist first
+          const callerId = body.callerId || body.from;
+          if (callerId && CallHandler.isUserBlocked(callerId)) {
+            console.log(`%c[BLOCKLIST] 🚫 Blocked incoming call from ${callerId}`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+            return; // Block the call
+          }
+          
+          // New incoming call - always allow (will set new call ID)
+          console.log(`%c[GUARD] ✅ Allowing NEW incoming call (new call ID: ${callId || 'none'})`, 'background: #28a745; color: white; font-weight: bold; padding: 5px;', {
+            callback: callbackName,
+            callId: callId || 'none',
+            callerId: callerId || body.from
+          });
+          
+          // Cleanup previous call state if call ID changed
+          if (CallHandler._currentCallId && CallHandler._currentCallId !== callId) {
+            console.log(`%c[GUARD] 🧹 Call ID changed - running cleanup`, 'background: #ff6b6b; color: white; font-weight: bold; padding: 5px;', {
+              oldCallId: CallHandler._currentCallId,
+              newCallId: callId
+            });
+            CallHandler._cleanupForNewCall(callId, 'New incoming call with different ID');
+          }
+          
+          return callback.apply(this, args);
+        }
+        
+        // For all other messages, check if THIS specific call ID is terminated
+        if (callId) {
+          const isThisCallTerminated = CallHandler.isCallTerminated(callId);
+          if (isThisCallTerminated) {
+            console.log(`%c[GUARD] 🚫 Blocked message - call ID ${callId} is terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+              callback: callbackName,
+              callId: callId
+            });
+            
+            if (typeof DebugLogger !== 'undefined') {
+              DebugLogger.addLog('terminated', 'NOTICE', '_guardTerminated', `Blocked ${callbackName} - call ID ${callId} terminated`, {
+                callId: callId
+              });
+            }
+            return; // Block the callback
+          }
+          
+          // Call ID exists and is NOT terminated - allow
+          console.log(`%c[GUARD] ✅ Allowing message - call ID ${callId} is active`, 'background: #28a745; color: white; padding: 3px;', {
+            callback: callbackName,
+            callId: callId
+          });
+          return callback.apply(this, args);
+        }
+        
+        // No call ID in message - fallback to old behavior (check global flag)
+        // This handles messages without call ID (backwards compatibility)
+        const isTerminated = CallHandler._isCallTerminated || (CallHandler._currentUIState && (
+          CallHandler._currentUIState.includes('terminated') ||
+          CallHandler._currentUIState.includes('rejected') ||
+          CallHandler._currentUIState.includes('declined') ||
+          CallHandler._currentUIState === 'ended'
+        ));
+        
+        if (isTerminated) {
+          console.log(`%c[GUARD] 🚫 Blocked message - no call ID, using global flag (terminated)`, 'background: #ffc107; color: black; padding: 3px;', {
+            callback: callbackName,
+            warning: 'Message missing callId - using legacy check'
+          });
+          return; // Block the callback
+        }
+        
+        // No call ID but not terminated - allow
+        console.log(`%c[GUARD] ✅ Allowing message - no call ID, not terminated`, 'background: #28a745; color: white; padding: 3px;', {
+          callback: callbackName
+        });
+        
+        return callback.apply(this, args);
+      };
+    };
+
     // SOCKET listeners (NO listener for CALL_RINGING — it is local-only)
+    // All callbacks wrapped with _guardTerminated to block messages when call is terminated
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_INCOMING,
-      callback: CallHandler.handleSocketIncomingCall,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketIncomingCall),
     });
     // Backend sends "call:initiate" to receiver, not "call:incoming"
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_INITIATE,
-      callback: CallHandler.handleSocketIncomingCall,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketIncomingCall),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_ACCEPTED,
-      callback: CallHandler.handleSocketAccepted,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketAccepted),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_DECLINED,
-      callback: CallHandler.handleSocketDeclined,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketDeclined),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_TIMEOUT,
-      callback: CallHandler.handleSocketTimeout,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketTimeout),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.CALL_CANCELLED,
-      callback: CallHandler.handleSocketCancelled,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketCancelled),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.SELF_STOP_RING,
-      callback: CallHandler.handleSocketSelfStopRinging,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketSelfStopRinging),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.MEETING_READY,
-      callback: CallHandler.handleSocketMeetingReady,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketMeetingReady),
     });
     SocketHandler.registerSocketListener({
       flag: CallHandler.FLAGS.MEETING_PROBLEM,
-      callback: CallHandler.handleSocketMeetingProblem,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketMeetingProblem),
     });
     SocketHandler.registerSocketListener({
       flag: "meeting:status",
-      callback: CallHandler.handleSocketMeetingStatus,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketMeetingStatus),
     });
     SocketHandler.registerSocketListener({
       flag: "grace:start",
-      callback: CallHandler.handleSocketGraceStart,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketGraceStart),
     });
     SocketHandler.registerSocketListener({
       flag: "grace:resume",
-      callback: CallHandler.handleSocketGraceResume,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketGraceResume),
     });
     SocketHandler.registerSocketListener({
       flag: "grace:end",
-      callback: CallHandler.handleSocketGraceEnd,
+      callback: CallHandler._guardTerminated(CallHandler.handleSocketGraceEnd),
     });
 
     // Wire up Join Meeting button for callee manual join
@@ -341,6 +893,14 @@ static dipatchUI(state, substate = "none", payload = {}) {
       });
     }
 
+    // Initialize blocklist from localStorage
+    CallHandler._loadBlocklistFromStorage();
+    
+    // Set up periodic cleanup for expired temporary blocks (every 5 minutes)
+    setInterval(() => {
+      CallHandler._cleanExpiredBlocks();
+    }, 5 * 60 * 1000);
+
     console.log("[CallHandler] init complete");
     DebugLogger.addLog("initialize", "NOTICE", "CallHandler.init", "Call handler initialized");
   }
@@ -351,6 +911,12 @@ static dipatchUI(state, substate = "none", payload = {}) {
   static handleStartInstantCallClick() {
     DebugLogger.addLog("calling", "NOTICE", "handleStartInstantCallClick", "UI click: Start Instant Call");
     console.log("[CallHandler] UI click: Start Instant Call");
+
+    // Clear terminated flag when starting a new call
+    if (CallHandler._isCallTerminated) {
+      console.log("[CallHandler] Clearing terminated flag - starting new call");
+      CallHandler._isCallTerminated = false;
+    }
 
     if (!CallHandler._els.callType) {
       console.log("[CallHandler] callType select missing");
@@ -481,8 +1047,14 @@ static dipatchUI(state, substate = "none", payload = {}) {
       chimeHandler._hasShownInCallAlert = false;
     }
     
-    // Reset UI state tracking for new call
-    CallHandler.resetUIState();
+    // Reset UI state tracking for new call (clear terminated flag)
+    CallHandler.resetUIState(true);
+    
+    // Leave any existing Chime meeting without rejoin prompt (starting new call)
+    if (typeof coreChime !== 'undefined' && coreChime._audioVideo) {
+      console.log("[CallHandler] Leaving old Chime meeting before new call");
+      coreChime.leave("Starting new call");
+    }
     
     // 🔔 UI (caller) → calling state
     CallHandler.dipatchUI("caller:callWaiting", "none", {
@@ -491,37 +1063,85 @@ static dipatchUI(state, substate = "none", payload = {}) {
       role: callerRole,
     });
 
-    // ⏲️ caller-side 25s timeout (symmetry with callee)
+    // ⏲️ caller-side 2min timeout (symmetry with callee)
     CallHandler.clearCallerRingTimer();
+    CallHandler.clearCallerGraceTimer();
+    const currentCallIdForCaller1 = CallHandler._currentCallId; // Store call ID in closure
     CallHandler._callerRingTimerId = setTimeout(() => {
+      // Check if call ID still matches (call might have changed)
+      if (CallHandler._currentCallId !== currentCallIdForCaller1) {
+        console.log("[CallHandler] Caller timeout: call ID changed, ignoring timeout");
+        return;
+      }
+      
+      // Check if we're still in callWaiting state for this call (not in a different state)
+      const isStillWaiting = CallHandler._currentUIState === 'caller:callWaiting';
+      if (!isStillWaiting) {
+        console.log("[CallHandler] Caller timeout: not in callWaiting state anymore, ignoring timeout", {
+          currentState: CallHandler._currentUIState,
+          callId: currentCallIdForCaller1
+        });
+        return;
+      }
+      
       console.log(
-        "[CallHandler] CALLER ring timeout → notify callee + end locally"
+        "[CallHandler] CALLER ring timeout → notify callee, start grace period"
       );
+      // Send timeout to callee
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.CALL_TIMEOUT,
         payload: {
           to: calleeIdVal,
           callerId: callerIdVal,
           calleeId: calleeIdVal,
+          callId: currentCallIdForCaller1,
         },
         schema: CallHandler.SCHEMA.timeout,
       });
       // stop own ringing
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.SELF_STOP_RING,
-        payload: { to: callerIdVal, calleeId: callerIdVal },
+        payload: { to: callerIdVal, calleeId: callerIdVal, callId: currentCallIdForCaller1 },
         schema: CallHandler.SCHEMA.selfStop,
       });
-      CallHandler.dipatchUI("caller:terminated", "timeout", {
-        callerId: callerIdVal,
-        calleeId: calleeIdVal,
-      });
-      DebugLogger.addLog(
-        "terminated",
-        "NOTICE",
-        "handleStartInstantCallClick",
-        "No answer (timeout)"
-      );
+      
+      // Start grace period - wait 10 seconds before terminating caller
+      CallHandler._callerGraceTimerId = setTimeout(() => {
+        // Check if call ID still matches
+        if (CallHandler._currentCallId !== currentCallIdForCaller1) {
+          console.log("[CallHandler] Grace period: call ID changed, ignoring termination");
+          return;
+        }
+        
+        // Check if we're already in an active call (accepted, connected, or joined)
+        const isInActiveCall = CallHandler._currentUIState && (
+          CallHandler._currentUIState.includes('callAccepted') ||
+          CallHandler._currentUIState.includes('connected') ||
+          CallHandler._currentUIState.includes('joined') ||
+          CallHandler._currentUIState === 'shared:inCall'
+        );
+        
+        if (isInActiveCall) {
+          console.log("[CallHandler] Grace period: call is already active, ignoring timeout termination", {
+            currentState: CallHandler._currentUIState,
+            callId: currentCallIdForCaller1
+          });
+          return;
+        }
+        
+        console.log("[CallHandler] Grace period ended → terminating caller");
+        CallHandler.clearCallerGraceTimer();
+        CallHandler.dipatchUI("caller:terminated", CallHandler.TERMINATION_REASONS.NO_ANSWER, {
+          callerId: callerIdVal,
+          calleeId: calleeIdVal,
+        });
+        DebugLogger.addLog(
+          "terminated",
+          "NOTICE",
+          "handleStartInstantCallClick",
+          "No answer (timeout)"
+        );
+      }, CallHandler._gracePeriodMs);
     }, CallHandler._ringTimeoutMs);
 
     DebugLogger.addLog("calling", "NOTICE", "handleStartInstantCallClick", "Calling...");
@@ -607,12 +1227,62 @@ static dipatchUI(state, substate = "none", payload = {}) {
       return;
     }
 
-    // Initialize CamMic permissions system
-    console.log('[CallHandler] Initializing CamMic permissions system');
-    window.dispatchEvent(new CustomEvent('CamMic:Init'));
+    // Check if this is a new call to different users (different caller/callee IDs)
+    const previousCallerId = CallHandler._invite?.callerId;
+    const previousCalleeId = CallHandler._invite?.calleeId;
+    const isNewCallToDifferentUsers = 
+      (previousCallerId && previousCallerId !== callerIdVal) || 
+      (previousCalleeId && previousCalleeId !== calleeIdVal);
+    
+    // If new call to different users, clear any previous terminated/disconnected states
+    if (isNewCallToDifferentUsers) {
+      console.log("%c[NEW CALL] 🔄 New call to different users - clearing previous call states", 'background: #17a2b8; color: white; font-weight: bold; padding: 5px;', {
+        previousCallerId,
+        previousCalleeId,
+        newCallerId: callerIdVal,
+        newCalleeId: calleeIdVal,
+        currentState: CallHandler._currentUIState,
+        isTerminated: CallHandler._isCallTerminated
+      });
+      
+      // Clear terminated flag
+      CallHandler._isCallTerminated = false;
+      
+      // Clear terminated/disconnected states from previous call
+      const currentState = CallHandler._currentUIState;
+      if (currentState && (
+        currentState.includes("terminated") || 
+        currentState.includes("disconnected") ||
+        currentState.includes("rejected") ||
+        currentState.includes("declined")
+      )) {
+        console.log("%c[NEW CALL] 🧹 Clearing previous call state:", 'background: #17a2b8; color: white; font-weight: bold; padding: 5px;', currentState);
+        CallHandler._currentUIState = null;
+        CallHandler._currentUISubstate = null;
+      }
+    }
 
-    // Store callType for caller
+    // Generate unique call ID for this call
+    const callId = CallHandler._generateCallId();
+    CallHandler.setCallId(callId);
+    console.log(`%c[CALL ID] 🆕 New call initiated with ID: ${callId}`, 'background: #007bff; color: white; font-weight: bold; padding: 8px;');
+    
+    // Reset UI state for new call
+    CallHandler.resetUIState(true); // Clear terminated flag for new call
+    
+    // Leave any existing Chime meeting without rejoin prompt (starting new call)
+    if (typeof coreChime !== 'undefined' && coreChime._audioVideo) {
+      console.log("[CallHandler] Leaving old Chime meeting before new call");
+      coreChime.leave("Starting new call");
+    }
+    
+    // Initialize CamMic permissions system (first call only)
+    CallHandler._ensureCamMicInitialized();
+
+    // Store callType and IDs for caller
     CallHandler._invite.callType = mediaType;
+    CallHandler._invite.callerId = callerIdVal;
+    CallHandler._invite.calleeId = calleeIdVal;
 
     // Populate mockCallData for the call
     if (window.mockCallData) {
@@ -623,6 +1293,11 @@ static dipatchUI(state, substate = "none", payload = {}) {
       // Use mockCallData users if CallHandler doesn't have them set
       CallHandler._currentUserData = CallHandler._currentUserData || window.mockCallData.currentUser;
       CallHandler._targetUserData = CallHandler._targetUserData || window.mockCallData.targetUser;
+      
+      // Sync mockCallData to Vue call settings
+      if (window.vueApp && typeof window.vueApp.syncMockDataToVueSettings === 'function') {
+        window.vueApp.syncMockDataToVueSettings();
+      }
     }
 
     // Validate user data before initiating call
@@ -653,6 +1328,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
         mediaType: mediaType,
         callerData: CallHandler._currentUserData,
         calleeData: CallHandler._targetUserData,
+        callId: callId,
       },
       schema: CallHandler.SCHEMA.initiate,
     });
@@ -684,37 +1360,85 @@ static dipatchUI(state, substate = "none", payload = {}) {
       `📞 Calling ${targetName} for ${mediaType} call...`
     );
 
-    // ⏲️ caller-side 25s timeout (symmetry with callee)
+    // ⏲️ caller-side 2min timeout (symmetry with callee)
     CallHandler.clearCallerRingTimer();
+    CallHandler.clearCallerGraceTimer();
+    const currentCallIdForCaller2 = callId; // Store call ID in closure
     CallHandler._callerRingTimerId = setTimeout(() => {
+      // Check if call ID still matches (call might have changed)
+      if (CallHandler._currentCallId !== currentCallIdForCaller2) {
+        console.log("[CallHandler] Caller timeout: call ID changed, ignoring timeout");
+        return;
+      }
+      
+      // Check if we're still in callWaiting state for this call (not in a different state)
+      const isStillWaiting = CallHandler._currentUIState === 'caller:callWaiting';
+      if (!isStillWaiting) {
+        console.log("[CallHandler] Caller timeout: not in callWaiting state anymore, ignoring timeout", {
+          currentState: CallHandler._currentUIState,
+          callId: currentCallIdForCaller2
+        });
+        return;
+      }
+      
       console.log(
-        "[CallHandler] CALLER ring timeout → notify callee + end locally"
+        "[CallHandler] CALLER ring timeout → notify callee, start grace period"
       );
+      // Send timeout to callee
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.CALL_TIMEOUT,
         payload: {
           to: calleeIdVal,
           callerId: callerIdVal,
           calleeId: calleeIdVal,
+          callId: currentCallIdForCaller2,
         },
         schema: CallHandler.SCHEMA.timeout,
       });
       // stop own ringing
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.SELF_STOP_RING,
-        payload: { to: callerIdVal, calleeId: callerIdVal },
+        payload: { to: callerIdVal, calleeId: callerIdVal, callId: currentCallIdForCaller2 },
         schema: CallHandler.SCHEMA.selfStop,
       });
-      CallHandler.dipatchUI("caller:terminated", "timeout", {
-        callerId: callerIdVal,
-        calleeId: calleeIdVal,
-      });
-      DebugLogger.addLog(
-        "terminated",
-        "NOTICE",
-        "_initiateCall",
-        "No answer (timeout)"
-      );
+      
+      // Start grace period - wait 10 seconds before terminating caller
+      CallHandler._callerGraceTimerId = setTimeout(() => {
+        // Check if call ID still matches
+        if (CallHandler._currentCallId !== currentCallIdForCaller2) {
+          console.log("[CallHandler] Grace period: call ID changed, ignoring termination");
+          return;
+        }
+        
+        // Check if we're already in an active call (accepted, connected, or joined)
+        const isInActiveCall = CallHandler._currentUIState && (
+          CallHandler._currentUIState.includes('callAccepted') ||
+          CallHandler._currentUIState.includes('connected') ||
+          CallHandler._currentUIState.includes('joined') ||
+          CallHandler._currentUIState === 'shared:inCall'
+        );
+        
+        if (isInActiveCall) {
+          console.log("[CallHandler] Grace period: call is already active, ignoring timeout termination", {
+            currentState: CallHandler._currentUIState,
+            callId: currentCallIdForCaller2
+          });
+          return;
+        }
+        
+        console.log("[CallHandler] Grace period ended → terminating caller");
+        CallHandler.clearCallerGraceTimer();
+        CallHandler.dipatchUI("caller:terminated", CallHandler.TERMINATION_REASONS.NO_ANSWER, {
+          callerId: callerIdVal,
+          calleeId: calleeIdVal,
+        });
+        DebugLogger.addLog(
+          "terminated",
+          "NOTICE",
+          "_initiateCall",
+          "No answer (timeout)"
+        );
+      }, CallHandler._gracePeriodMs);
     }, CallHandler._ringTimeoutMs);
 
     DebugLogger.addLog(
@@ -728,6 +1452,9 @@ static dipatchUI(state, substate = "none", payload = {}) {
   static handleAcceptClick() {
     DebugLogger.addLog("receiving call", "NOTICE", "handleAcceptClick", "UI click: Accept");
     console.log("[CallHandler] UI click: Accept");
+    
+    // DO NOT reset settings here - we're accepting an existing call with already-populated data
+    // Reset only happens on terminate or when starting a brand new call
 
     if (!CallHandler._els.currentUserId) {
       console.log("[CallHandler] currentUserId input missing");
@@ -839,6 +1566,43 @@ static dipatchUI(state, substate = "none", payload = {}) {
     const targetUserData = CallHandler._invite.callerData || window.mockCallData?.targetUser;
     if (!CallHandler.validateUserData(currentUserData, "Current user (callee) data")) return;
     if (!CallHandler.validateUserData(targetUserData, "Target user (caller) data")) return;
+    
+    // Validate current with target for the callee side
+    // For callee: currentUserId should match calleeId, targetUserId should match callerId
+    if (CallHandler._invite.calleeId && calleeIdVal !== CallHandler._invite.calleeId) {
+      console.error("[CallHandler] [Callee] Validation failed: currentUserId does not match invite calleeId", {
+        currentUserId: calleeIdVal,
+        inviteCalleeId: CallHandler._invite.calleeId
+      });
+      DebugLogger.addLog(
+        "accepted call",
+        "CRITICAL",
+        "handleAcceptClick",
+        "Current user ID does not match invite callee ID"
+      );
+      return;
+    }
+    if (CallHandler._invite.callerId && callerIdVal !== CallHandler._invite.callerId) {
+      console.error("[CallHandler] [Callee] Validation failed: targetUserId does not match invite callerId", {
+        targetUserId: callerIdVal,
+        inviteCallerId: CallHandler._invite.callerId
+      });
+      DebugLogger.addLog(
+        "accepted call",
+        "CRITICAL",
+        "handleAcceptClick",
+        "Target user ID does not match invite caller ID"
+      );
+      return;
+    }
+
+    // Finalize userData when call is accepted
+    CallHandler._currentUserData = currentUserData;
+    CallHandler._targetUserData = targetUserData;
+    console.log("[CallHandler] ✅ UserData finalized on call acceptance", {
+      currentUser: CallHandler._currentUserData,
+      targetUser: CallHandler._targetUserData
+    });
 
     // Clear callee's ring timer since we're accepting
     CallHandler.clearCalleeRingTimer();
@@ -865,7 +1629,11 @@ static dipatchUI(state, substate = "none", payload = {}) {
     console.log("[CallHandler] SELF_STOP_RING to callee (all devices)");
     SocketHandler.sendSocketMessage({
       flag: CallHandler.FLAGS.SELF_STOP_RING,
-      payload: { to: calleeIdVal, calleeId: calleeIdVal },
+      payload: { 
+        to: calleeIdVal, 
+        calleeId: calleeIdVal,
+        callId: CallHandler._currentCallId,
+      },
       schema: CallHandler.SCHEMA.selfStop,
     });
 
@@ -876,6 +1644,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
         to: callerIdVal,
         callerId: callerIdVal,
         calleeId: calleeIdVal,
+        callId: CallHandler._currentCallId,
       },
       schema: CallHandler.SCHEMA.accept,
     });
@@ -897,16 +1666,57 @@ static dipatchUI(state, substate = "none", payload = {}) {
     const isVideoCall = mediaType === 'video';
     console.log('[CallHandler] [Callee] [FIX v1.1] Media type:', mediaType, 'isVideoCall:', isVideoCall);
     
+    // Helper function to wait for UI state to actually change (event-based only)
+    const waitForUIStateChange = (targetState) => {
+      return new Promise((resolve) => {
+        console.log('[CallHandler] [Callee] [FIX v1.1] ⏳ Waiting for UI state to change to:', targetState);
+        
+        // Check if already in target state
+        const vueState = window.vueApp?.state;
+        const currentState = vueState || CallHandler._currentUIState;
+        if (currentState === targetState) {
+          console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Already in target state:', targetState);
+          resolve();
+          return;
+        }
+        
+        // Listen for state change events only
+        const stateListener = (ev) => {
+          const newState = ev.detail?.state;
+          const vueState = window.vueApp?.state;
+          const currentState = vueState || newState || CallHandler._currentUIState;
+          
+          if (currentState === targetState) {
+            document.removeEventListener('chime-ui::state', stateListener);
+            console.log('[CallHandler] [Callee] [FIX v1.1] ✅ UI state confirmed changed to:', targetState);
+            resolve();
+          }
+        };
+        
+        document.addEventListener('chime-ui::state', stateListener);
+      });
+    };
+    
     // Listen for when browser will prompt (shows UI BEFORE browser freezes)
-    const onShowWaiting = (ev) => {
+    const onShowWaiting = async (ev) => {
       console.log('[CallHandler] [Callee] [FIX v1.1] ⏳ CamMic:UI:ShowWaiting received - showing waiting UI NOW');
       console.log('[CallHandler] [Callee] [FIX v1.1] Event detail:', ev.detail);
+      
+      // Shift UI first
       CallHandler.dipatchUI("callee:waitingForCamMicPermissions", "none", {
         callerId: callerIdVal,
         calleeId: calleeIdVal,
         role: calleeRole,
       });
-      console.log('[CallHandler] [Callee] [FIX v1.1] ✅ UI transitioned to callee:waitingForCamMicPermissions');
+      console.log('[CallHandler] [Callee] [FIX v1.1] 📺 UI shift dispatched, waiting for confirmation...');
+      
+      // Wait for UI to actually change
+      try {
+        await waitForUIStateChange("callee:waitingForCamMicPermissions");
+        console.log('[CallHandler] [Callee] [FIX v1.1] ✅ UI confirmed shifted to callee:waitingForCamMicPermissions');
+      } catch (error) {
+        console.warn('[CallHandler] [Callee] [FIX v1.1] ⚠️ Could not confirm UI shift, proceeding anyway:', error);
+      }
     };
     
     // Listen for permissions resolved
@@ -990,10 +1800,46 @@ static dipatchUI(state, substate = "none", payload = {}) {
       window.addEventListener('CamMic:Orchestrate:Complete', onAcceptComplete);
       console.log('[CallHandler] [Callee] [FIX v1.1] ✅ All listeners registered');
       
-      // Start orchestration
-      console.log('[CallHandler] [Callee] [FIX v1.1] 🚀 Dispatching CamMic:Orchestrate:Both:NoPreview');
-      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));
-      console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Orchestration started - waiting for events...');
+      // Check if we need to shift UI first, then start orchestration
+      const startOrchestration = async () => {
+        // Check current permissions to see if we need to show waiting UI
+        try {
+          const cameraState = await navigator.permissions?.query({ name: 'camera' }).then(r => r.state).catch(() => 'prompt');
+          const micState = await navigator.permissions?.query({ name: 'microphone' }).then(r => r.state).catch(() => 'prompt');
+          
+          const needsPrompt = cameraState === 'prompt' || micState === 'prompt';
+          
+          if (needsPrompt) {
+            console.log('[CallHandler] [Callee] [FIX v1.1] 📺 Permissions need prompt - shifting UI first');
+            // Shift UI first
+            CallHandler.dipatchUI("callee:waitingForCamMicPermissions", "none", {
+              callerId: callerIdVal,
+              calleeId: calleeIdVal,
+              role: calleeRole,
+            });
+            
+            // Wait for UI to actually shift
+            try {
+              await waitForUIStateChange("callee:waitingForCamMicPermissions");
+              console.log('[CallHandler] [Callee] [FIX v1.1] ✅ UI confirmed shifted - starting orchestration');
+            } catch (error) {
+              console.warn('[CallHandler] [Callee] [FIX v1.1] ⚠️ Could not confirm UI shift, proceeding anyway:', error);
+            }
+          } else {
+            console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Permissions already granted - no UI shift needed');
+          }
+        } catch (error) {
+          console.warn('[CallHandler] [Callee] [FIX v1.1] ⚠️ Error checking permissions, proceeding:', error);
+        }
+        
+        // Start orchestration after UI shift (if needed)
+        console.log('[CallHandler] [Callee] [FIX v1.1] 🚀 Dispatching CamMic:Orchestrate:Both:NoPreview');
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));
+        console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Orchestration started - waiting for events...');
+      };
+      
+      // Start the flow
+      startOrchestration();
       
     } else {
       // Audio call: orchestrate microphone only
@@ -1056,10 +1902,45 @@ static dipatchUI(state, substate = "none", payload = {}) {
       window.addEventListener('CamMic:Orchestrate:Complete', onAcceptComplete);
       console.log('[CallHandler] [Callee] [FIX v1.1] ✅ All listeners registered (audio)');
       
-      // Start orchestration
-      console.log('[CallHandler] [Callee] [FIX v1.1] 🚀 Dispatching CamMic:Orchestrate:Microphone');
-      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));
-      console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Orchestration started (audio) - waiting for events...');
+      // Check if we need to shift UI first, then start orchestration
+      const startOrchestration = async () => {
+        // Check current permissions to see if we need to show waiting UI
+        try {
+          const micState = await navigator.permissions?.query({ name: 'microphone' }).then(r => r.state).catch(() => 'prompt');
+          
+          const needsPrompt = micState === 'prompt';
+          
+          if (needsPrompt) {
+            console.log('[CallHandler] [Callee] [FIX v1.1] 📺 Microphone needs prompt - shifting UI first');
+            // Shift UI first
+            CallHandler.dipatchUI("callee:waitingForCamMicPermissions", "none", {
+              callerId: callerIdVal,
+              calleeId: calleeIdVal,
+              role: calleeRole,
+            });
+            
+            // Wait for UI to actually shift
+            try {
+              await waitForUIStateChange("callee:waitingForCamMicPermissions");
+              console.log('[CallHandler] [Callee] [FIX v1.1] ✅ UI confirmed shifted - starting orchestration');
+            } catch (error) {
+              console.warn('[CallHandler] [Callee] [FIX v1.1] ⚠️ Could not confirm UI shift, proceeding anyway:', error);
+            }
+          } else {
+            console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Microphone already granted - no UI shift needed');
+          }
+        } catch (error) {
+          console.warn('[CallHandler] [Callee] [FIX v1.1] ⚠️ Error checking permissions, proceeding:', error);
+        }
+        
+        // Start orchestration after UI shift (if needed)
+        console.log('[CallHandler] [Callee] [FIX v1.1] 🚀 Dispatching CamMic:Orchestrate:Microphone');
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));
+        console.log('[CallHandler] [Callee] [FIX v1.1] ✅ Orchestration started (audio) - waiting for events...');
+      };
+      
+      // Start the flow
+      startOrchestration();
     }
     
     // Return early - the rest of the accept flow will run in continueAcceptFlow()
@@ -1081,6 +1962,10 @@ static dipatchUI(state, substate = "none", payload = {}) {
         message: "Creating meeting in database...",
       },
     });
+    
+    // Create new AbortController for this API request chain
+    console.log('%c[API] Creating new AbortController for meeting setup', 'background: #17a2b8; color: white; padding: 5px;');
+    CallHandler._apiAbortController = new AbortController();
     
     CallHandler.getMeetingID(calleeIdVal, calleeRole)
       .then((meetingId) => {
@@ -1137,6 +2022,17 @@ static dipatchUI(state, substate = "none", payload = {}) {
           `Sending to caller: DB ID = ${meetingId}, Chime ID = ${chimeId}`
         );
 
+        // Fix callerRole type validation - ensure it's a string
+        const callerRoleValue = typeof CallHandler._invite.callerRole === 'string' 
+          ? CallHandler._invite.callerRole 
+          : (CallHandler._invite.callerRole?.value || 'attendee');
+        
+        console.log('%c[MEETING_READY] Sending with callerRole:', 'background: #28a745; color: white; padding: 5px;', {
+          callerRoleRaw: CallHandler._invite.callerRole,
+          callerRoleValue: callerRoleValue,
+          calleeRole: calleeRole
+        });
+        
         SocketHandler.sendSocketMessage({
           flag: CallHandler.FLAGS.MEETING_READY,
           payload: {
@@ -1144,10 +2040,11 @@ static dipatchUI(state, substate = "none", payload = {}) {
             meetingId,
             callerId: callerIdVal,
             calleeId: calleeIdVal,
-            callerRole: CallHandler._invite.callerRole,
+            callerRole: callerRoleValue,
             calleeRole,
             chimeMeetingId: chimeId,
             dbMeetingId: meetingId,
+            callId: CallHandler._currentCallId,
           },
           schema: CallHandler.SCHEMA.meetingReady,
         });
@@ -1163,6 +2060,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
           
           // Store join info for when the Join button is clicked
           CallHandler._pendingCalleeJoin = {
+            callId: CallHandler._currentCallId,
             meetingId,
             calleeId: calleeIdVal,
             calleeRole,
@@ -1472,6 +2370,363 @@ static dipatchUI(state, substate = "none", payload = {}) {
     DebugLogger.addLog("terminated", "NOTICE", "handleCancelClick", "Call cancelled");
   }
 
+  /* ====================================================================
+   * handleTerminateClick()
+   * Called when user clicks end-call button during callWaiting or callAccepted
+   * ==================================================================== */
+  static handleTerminateClick() {
+    DebugLogger.addLog("calling", "NOTICE", "handleTerminateClick", "User clicked end-call");
+    console.log("%c[TERMINATE] 🚨 handleTerminateClick called", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+
+    // Get IDs from form inputs - NO FALLBACK, throw error if missing
+    const currentUserInput = document.getElementById('currentUserId');
+    const targetUserInput = document.getElementById('targetUserId');
+    
+    if (!currentUserInput || !targetUserInput) {
+      console.error("%c[TERMINATE] ❌ Form input elements not found", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      DebugLogger.addLog("terminated", "CRITICAL", "handleTerminateClick", "Form input elements not found");
+      return;
+    }
+    
+    const callerId = currentUserInput.value.trim();
+    const calleeId = targetUserInput.value.trim();
+    
+    if (!callerId || !calleeId) {
+      console.error("%c[TERMINATE] ❌ Form inputs are empty", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', { callerId, calleeId });
+      DebugLogger.addLog("terminated", "CRITICAL", "handleTerminateClick", "Form inputs are empty");
+      return;
+    }
+    
+    console.log("%c[TERMINATE] 📋 User IDs from form", 'background: #17a2b8; color: white; padding: 5px;', { 
+      currentUser: callerId, 
+      targetUser: calleeId
+    });
+
+    // Get role from _currentSide (set during call initiation)
+    const role = CallHandler._currentSide || 'caller';
+    console.log("%c[TERMINATE] 👤 Role", 'background: #17a2b8; color: white; padding: 5px;', { 
+      role,
+      source: CallHandler._currentSide ? '_currentSide' : 'default'
+    });
+
+    // Detect termination reason
+    let terminationReason;
+    if (CallHandler._inCallOrConnecting === true) {
+      terminationReason = CallHandler.TERMINATION_REASONS.ON_ANOTHER_CALL;
+      console.log("%c[TERMINATE] 🔍 Detected reason: ON_ANOTHER_CALL", 'background: #ffc107; color: black; padding: 5px;');
+    } else {
+      terminationReason = CallHandler.TERMINATION_REASONS.BUSY;
+      console.log("%c[TERMINATE] 🔍 Detected reason: BUSY", 'background: #ffc107; color: black; padding: 5px;');
+    }
+
+    // Shutdown and reset all Chime calls and stop all video streams
+    console.log("%c[TERMINATE] 🔌 Shutting down Chime meeting and stopping all streams", 'background: #17a2b8; color: white; padding: 5px;');
+    
+    // 1. Disconnect from Chime meeting (built-in cleanup)
+    if (window.chimeHandler && typeof chimeHandler.handleEnd === 'function') {
+      console.log("%c[TERMINATE] 🔌 Calling chimeHandler.handleEnd()", 'background: #17a2b8; color: white; padding: 5px;');
+      chimeHandler.handleEnd(true);
+    } else if (typeof coreChime !== 'undefined' && typeof coreChime.leave === 'function') {
+      console.log("%c[TERMINATE] 🔌 Calling coreChime.leave() directly", 'background: #17a2b8; color: white; padding: 5px;');
+      coreChime.leave("User ended call");
+    } else {
+      console.log("%c[TERMINATE] ⚠️ Chime handlers not available", 'background: #ffc107; color: black; padding: 5px;');
+    }
+    
+    // 2. Stop all camera/mic streams via CamMic permissions handler (safety)
+    try {
+      if (window.CamMicPermissionsHandler && typeof window.CamMicPermissionsHandler.stopAllStreams === 'function') {
+        console.log("%c[TERMINATE] 🎥 Stopping all streams via CamMicPermissionsHandler", 'background: #17a2b8; color: white; padding: 5px;');
+        window.CamMicPermissionsHandler.stopAllStreams();
+      } else if (window.CamMicPermissionsUtility && typeof window.CamMicPermissionsUtility.stopStreams === 'function') {
+        console.log("%c[TERMINATE] 🎥 Stopping all streams via CamMicPermissionsUtility", 'background: #17a2b8; color: white; padding: 5px;');
+        window.CamMicPermissionsUtility.stopStreams();
+      } else {
+        // Fallback: dispatch event
+        console.log("%c[TERMINATE] 🎥 Dispatching CamMic:Streams:Stop event", 'background: #17a2b8; color: white; padding: 5px;');
+        window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));
+      }
+    } catch (err) {
+      console.error("%c[TERMINATE] ❌ Error stopping streams", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', err);
+    }
+
+    // Check if SocketHandler exists
+    if (typeof SocketHandler === 'undefined') {
+      console.error("%c[TERMINATE] ❌ SocketHandler is not defined!", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      DebugLogger.addLog("terminated", "CRITICAL", "handleTerminateClick", "SocketHandler not defined");
+      return;
+    }
+
+    if (typeof SocketHandler.sendSocketMessage !== 'function') {
+      console.error("%c[TERMINATE] ❌ SocketHandler.sendSocketMessage is not a function!", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      DebugLogger.addLog("terminated", "CRITICAL", "handleTerminateClick", "SocketHandler.sendSocketMessage not a function");
+      return;
+    }
+
+    // Recipient is ALWAYS the targetUser (the other person)
+    const recipientId = calleeId;
+    
+    console.log("%c[TERMINATE] TERMINATED TO: " + recipientId, 'background: #ff0000; color: white; font-weight: bold; font-size: 14px; padding: 8px;', {
+      from: callerId,
+      to: recipientId,
+      role,
+      message: `Sending termination from ${callerId} to ${recipientId}`
+    });
+    
+    // Determine substate based on role and current state - DIRECT CHECK, NO FALLBACKS
+    let localSubstate = terminationReason; // Default: Busy or on_another_call
+    let socketReason = 'cancelled'; // Default reason for socket message
+    
+    if (role === 'callee') {
+      // Callee terminating - check if in incoming call state (not answered yet) OR callAccepted state
+      const isIncomingCall = CallHandler._currentUIState === 'callee:incomingVideoCall' || 
+                            CallHandler._currentUIState === 'callee:incomingAudioCall';
+      const isCallAccepted = CallHandler._currentUIState === 'callee:callAccepted';
+      if (isIncomingCall || isCallAccepted) {
+        // Callee declined before accepting OR declined from callAccepted state
+        localSubstate = 'declined';
+        socketReason = 'declined';
+      } else {
+        // Callee ended after accepting (joined/inCall/connected)
+        localSubstate = terminationReason; // Busy or on_another_call
+        socketReason = 'ended';
+      }
+    } else if (role === 'caller') {
+      // Caller cancelling - check if in callWaiting (callee not answered) or in call (callee answered)
+      const isCallWaiting = CallHandler._currentUIState === 'caller:callWaiting';
+      const isInCall = CallHandler._currentUIState && (
+        CallHandler._currentUIState.includes('connected') || 
+        CallHandler._currentUIState.includes('joined') ||
+        CallHandler._currentUIState === 'caller:callAccepted' ||
+        CallHandler._currentUIState === 'shared:inCall'
+      );
+      if (isCallWaiting) {
+        // Caller cancelled before callee answered - caller sees "You have cancelled the call"
+        localSubstate = 'caller_cancelled'; // Special substate for caller cancelling
+        socketReason = 'cancelled';
+      } else if (isInCall) {
+        // Caller ended after callee answered
+        localSubstate = terminationReason; // Busy or on_another_call
+        socketReason = 'ended';
+      } else {
+        // Fallback
+        localSubstate = terminationReason;
+        socketReason = 'cancelled';
+      }
+    }
+
+    const socketMessage = {
+      flag: CallHandler.FLAGS.CALL_CANCELLED,
+      payload: {
+        to: recipientId,
+        callerId: callerId,
+        calleeId: calleeId,
+        callId: CallHandler._currentCallId,
+        reason: socketReason,
+      },
+      schema: CallHandler.SCHEMA.cancel,
+    };
+
+    console.log("%c[TERMINATE] 📤 Sending CALL_CANCELLED socket message", 'background: #28a745; color: white; font-weight: bold; padding: 5px;', {
+      flag: socketMessage.flag,
+      flagValue: CallHandler.FLAGS.CALL_CANCELLED,
+      payload: socketMessage.payload,
+      schema: socketMessage.schema,
+      fullMessage: JSON.stringify(socketMessage, null, 2)
+    });
+
+    // Terminate this call ID
+    if (CallHandler._currentCallId) {
+      CallHandler.terminateCall(CallHandler._currentCallId);
+    }
+    
+    // Run comprehensive cleanup for termination
+    console.log('%c[TERMINATE] 🧹 Running cleanup for terminated call', 'background: #ff6b6b; color: white; font-weight: bold; padding: 5px;');
+    CallHandler._cleanupForNewCall(null, 'Call terminated by user');
+    
+    // Clear all call-related state (database IDs, meeting info, etc.)
+    CallHandler.clearAllCallState();
+    
+    // Reset Vue call settings (including cam/mic)
+    if (window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
+      window.vueApp.resetCallSettings();
+    }
+    
+    // Reset mockCallData on terminate
+    if (window.mockCallData) {
+      console.log('[CallHandler] Resetting mockCallData on terminate');
+      window.mockCallData.callType = null;
+      window.mockCallData.mediaType = null;
+      window.mockCallData.currentUserRole = null;
+      window.mockCallData.currentUserSide = null;
+      window.mockCallData.isInGrace = false;
+      // Note: We keep currentUser and targetUser as they may be persistent user info
+    }
+    
+    try {
+      SocketHandler.sendSocketMessage(socketMessage);
+      console.log("%c[TERMINATE] ✅ Socket message sent successfully", 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+      DebugLogger.addLog("terminated", "NOTICE", "handleTerminateClick", "Socket message sent", socketMessage);
+    } catch (error) {
+      console.error("%c[TERMINATE] ❌ Error sending socket message", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', error);
+      DebugLogger.addLog("terminated", "CRITICAL", "handleTerminateClick", "Error sending socket message", { error: error.message });
+    }
+
+    // Dispatch local CALL_CANCELLED event
+    console.log("%c[TERMINATE] 📢 Dispatching local CALL_CANCELLED event", 'background: #17a2b8; color: white; padding: 5px;');
+    document.dispatchEvent(
+      new CustomEvent(CallHandler.FLAGS.CALL_CANCELLED, {
+        detail: { callerId: callerId, calleeId: calleeId },
+      })
+    );
+
+    // Set terminated state with determined substate
+    const terminatedState = `${role}:terminated`;
+    console.log("%c[TERMINATE] 🎯 Setting UI state", 'background: #17a2b8; color: white; padding: 5px;', { 
+      terminatedState, 
+      substate: localSubstate, 
+      reason: terminationReason,
+      currentState: CallHandler._currentUIState,
+      role
+    });
+    CallHandler.dipatchUI(terminatedState, localSubstate, {
+      callerId: callerId,
+      calleeId: calleeId,
+    });
+
+    DebugLogger.addLog("terminated", "NOTICE", "handleTerminateClick", "Call terminated by user");
+    console.log("%c[TERMINATE] ✅ handleTerminateClick completed", 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+  }
+
+  /* ====================================================================
+   * handleInsufficientTokens()
+   * Called when caller or callee ends call due to insufficient tokens
+   * ==================================================================== */
+  static handleInsufficientTokens() {
+    DebugLogger.addLog("terminated", "NOTICE", "handleInsufficientTokens", "Call ended due to insufficient tokens");
+    console.log("%c[INSUFFICIENT_TOKENS] 🚨 Call ended due to insufficient tokens", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+
+    // Get IDs from form inputs
+    const currentUserInput = document.getElementById('currentUserId');
+    const targetUserInput = document.getElementById('targetUserId');
+    
+    if (!currentUserInput || !targetUserInput) {
+      console.error("%c[INSUFFICIENT_TOKENS] ❌ Form input elements not found", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      return;
+    }
+    
+    const currentUserId = currentUserInput.value.trim();
+    const targetUserId = targetUserInput.value.trim();
+    
+    if (!currentUserId || !targetUserId) {
+      console.error("%c[INSUFFICIENT_TOKENS] ❌ Form inputs are empty", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      return;
+    }
+
+    // Determine role (caller or callee) from _currentSide or _invite
+    let role = CallHandler._currentSide;
+    let callerId, calleeId;
+    
+    if (!role) {
+      // Try to determine from _invite
+      if (CallHandler._invite && CallHandler._invite.callerId && CallHandler._invite.calleeId) {
+        if (CallHandler._invite.callerId === currentUserId) {
+          role = 'caller';
+          callerId = CallHandler._invite.callerId;
+          calleeId = CallHandler._invite.calleeId;
+        } else if (CallHandler._invite.calleeId === currentUserId) {
+          role = 'callee';
+          callerId = CallHandler._invite.callerId;
+          calleeId = CallHandler._invite.calleeId;
+        } else {
+          // Fallback: use form inputs
+          role = 'caller'; // Default assumption
+          callerId = currentUserId;
+          calleeId = targetUserId;
+        }
+      } else {
+        // Fallback: use form inputs
+        role = 'caller'; // Default assumption
+        callerId = currentUserId;
+        calleeId = targetUserId;
+      }
+    } else {
+      // Use _invite data if available, otherwise use form inputs
+      if (CallHandler._invite && CallHandler._invite.callerId && CallHandler._invite.calleeId) {
+        callerId = CallHandler._invite.callerId;
+        calleeId = CallHandler._invite.calleeId;
+      } else {
+        callerId = currentUserId;
+        calleeId = targetUserId;
+      }
+    }
+    
+    console.log("%c[INSUFFICIENT_TOKENS] 📋 Role determined", 'background: #17a2b8; color: white; padding: 5px;', { role, callerId, calleeId });
+    
+    // Shutdown and reset all Chime calls and stop all video streams
+    console.log("%c[INSUFFICIENT_TOKENS] 🔌 Shutting down Chime meeting and stopping all streams", 'background: #17a2b8; color: white; padding: 5px;');
+    
+    // 1. Disconnect from Chime meeting
+    if (window.chimeHandler && typeof chimeHandler.handleEnd === 'function') {
+      chimeHandler.handleEnd(true); // Pass true to indicate user-initiated termination
+    } else if (typeof coreChime !== 'undefined' && typeof coreChime.leave === 'function') {
+      coreChime.leave("Insufficient tokens");
+    }
+    
+    // 2. Stop all camera/mic streams
+    try {
+      if (window.CamMicPermissionsHandler && typeof window.CamMicPermissionsHandler.stopAllStreams === 'function') {
+        window.CamMicPermissionsHandler.stopAllStreams();
+      } else if (window.CamMicPermissionsUtility && typeof window.CamMicPermissionsUtility.stopStreams === 'function') {
+        window.CamMicPermissionsUtility.stopStreams();
+      } else {
+        window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));
+      }
+    } catch (err) {
+      console.error("%c[INSUFFICIENT_TOKENS] ❌ Error stopping streams", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', err);
+    }
+
+    // Send cancellation to the other party
+    const recipientId = role === 'caller' ? calleeId : callerId;
+    if (typeof SocketHandler !== 'undefined' && typeof SocketHandler.sendSocketMessage === 'function') {
+      SocketHandler.sendSocketMessage({
+        flag: CallHandler.FLAGS.CALL_CANCELLED,
+        payload: {
+          to: recipientId,
+          callerId: callerId,
+          calleeId: calleeId,
+          callId: CallHandler._currentCallId,
+          reason: CallHandler.TERMINATION_REASONS.INSUFFICIENT_TOKENS,
+        },
+        schema: CallHandler.SCHEMA.cancel,
+      });
+    }
+
+    // Terminate this call ID
+    if (CallHandler._currentCallId) {
+      CallHandler.terminateCall(CallHandler._currentCallId);
+    }
+
+    // Clear all call-related state (database IDs, meeting info, etc.)
+    CallHandler.clearAllCallState();
+
+    // Dispatch local event for insufficient tokens
+    document.dispatchEvent(
+      new CustomEvent('call:insufficient_tokens', {
+        detail: { callerId, calleeId, reason: CallHandler.TERMINATION_REASONS.INSUFFICIENT_TOKENS, role },
+      })
+    );
+
+    // Set terminated state (works for both caller and callee)
+    const terminatedState = `${role}:terminated`;
+    CallHandler.dipatchUI(terminatedState, CallHandler.TERMINATION_REASONS.INSUFFICIENT_TOKENS, {
+      callerId: callerId,
+      calleeId: calleeId,
+    });
+
+    DebugLogger.addLog("terminated", "NOTICE", "handleInsufficientTokens", "Call ended due to insufficient tokens", { role });
+  }
+
   /* ===========================
    * APP DISPATCH (optional)
    * ========================= */
@@ -1482,6 +2737,18 @@ static dipatchUI(state, substate = "none", payload = {}) {
       console.log("[CallHandler] app:call:start missing detail");
       DebugLogger.addLog("calling", "CRITICAL", "handleAppStartCall", "Missing payload");
       return;
+    }
+
+    // Reset all call settings for new call (prevent inheritance from previous call)
+    console.log("[CallHandler] Resetting all call settings for new call");
+    if (window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
+      window.vueApp.resetCallSettings();
+    }
+
+    // Clear terminated flag when starting a new call
+    if (CallHandler._isCallTerminated) {
+      console.log("[CallHandler] Clearing terminated flag - starting new call");
+      CallHandler._isCallTerminated = false;
     }
 
     const callerId = d.callerId;
@@ -1561,304 +2828,103 @@ static dipatchUI(state, substate = "none", payload = {}) {
       role: callerRole,
     });
 
-    // ⏲️ caller-side 25s timeout
+    // ⏲️ caller-side 2min timeout
     CallHandler.clearCallerRingTimer();
+    CallHandler.clearCallerGraceTimer();
+    const currentCallIdForCaller3 = CallHandler._currentCallId; // Store call ID in closure
     CallHandler._callerRingTimerId = setTimeout(() => {
+      // Check if call ID still matches (call might have changed)
+      if (CallHandler._currentCallId !== currentCallIdForCaller3) {
+        console.log("[CallHandler] Caller timeout: call ID changed, ignoring timeout");
+        return;
+      }
+      
+      // Check if we're still in callWaiting state for this call (not in a different state)
+      const isStillWaiting = CallHandler._currentUIState === 'caller:callWaiting';
+      if (!isStillWaiting) {
+        console.log("[CallHandler] Caller timeout: not in callWaiting state anymore, ignoring timeout", {
+          currentState: CallHandler._currentUIState,
+          callId: currentCallIdForCaller3
+        });
+        return;
+      }
+      
       console.log(
-        "[CallHandler] CALLER ring timeout (app) → notify callee + end locally"
+        "[CallHandler] CALLER ring timeout (app) → notify callee, start grace period"
       );
+      // Send timeout to callee
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.CALL_TIMEOUT,
-        payload: { to: calleeId, callerId, calleeId },
+        payload: { to: calleeId, callerId, calleeId, callId: currentCallIdForCaller3 },
         schema: CallHandler.SCHEMA.timeout,
       });
       SocketHandler.sendSocketMessage({
         flag: CallHandler.FLAGS.SELF_STOP_RING,
-        payload: { to: callerId, calleeId: callerId },
+        payload: { to: callerId, calleeId: callerId, callId: currentCallIdForCaller3 },
         schema: CallHandler.SCHEMA.selfStop,
       });
-      CallHandler.dipatchUI("caller:terminated", "timeout", {
-        callerId,
-        calleeId,
-      });
-      DebugLogger.addLog(
-        "terminated",
-        "NOTICE",
-        "handleAppStartCall",
-        "No answer (timeout)"
-      );
+      
+      // Start grace period - wait 10 seconds before terminating caller
+      CallHandler._callerGraceTimerId = setTimeout(() => {
+        // Check if call ID still matches
+        if (CallHandler._currentCallId !== currentCallIdForCaller3) {
+          console.log("[CallHandler] Grace period: call ID changed, ignoring termination");
+          return;
+        }
+        
+        // Check if we're already in an active call (accepted, connected, or joined)
+        const isInActiveCall = CallHandler._currentUIState && (
+          CallHandler._currentUIState.includes('callAccepted') ||
+          CallHandler._currentUIState.includes('connected') ||
+          CallHandler._currentUIState.includes('joined') ||
+          CallHandler._currentUIState === 'shared:inCall'
+        );
+        
+        if (isInActiveCall) {
+          console.log("[CallHandler] Grace period: call is already active, ignoring timeout termination", {
+            currentState: CallHandler._currentUIState,
+            callId: currentCallIdForCaller3
+          });
+          return;
+        }
+        
+        console.log("[CallHandler] Grace period ended → terminating caller");
+        CallHandler.clearCallerGraceTimer();
+        CallHandler.dipatchUI("caller:terminated", CallHandler.TERMINATION_REASONS.NO_ANSWER, {
+          callerId,
+          calleeId,
+        });
+        DebugLogger.addLog(
+          "terminated",
+          "NOTICE",
+          "handleAppStartCall",
+          "No answer (timeout)"
+        );
+      }, CallHandler._gracePeriodMs);
     }, CallHandler._ringTimeoutMs);
 
     DebugLogger.addLog("calling", "NOTICE", "handleAppStartCall", "Calling...");
   }
 
-  static handleAppAcceptCall(e) {
-    console.log("[CallHandler] app:call:accept", e);
+
+  static handleAppTerminateCall(e) {
+    console.log("%c[CallHandler] app:call:terminate event received", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', e);
     const d = e && e.detail ? e.detail : undefined;
+    console.log("[CallHandler] Event detail:", d);
     if (!d) {
-      console.log("[CallHandler] app:call:accept missing detail");
+      console.error("%c[CallHandler] app:call:terminate missing detail", 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
       DebugLogger.addLog(
-        "accepted call",
+        "terminated",
         "CRITICAL",
-        "handleAppAcceptCall",
+        "handleAppTerminateCall",
         "Missing payload"
       );
       return;
     }
 
-    const callerId = d.callerId;
-    const calleeId = d.calleeId;
-    const calleeRole = d.role;
-    const callType = d.callType;
-
-    if (callType !== CallHandler.TYPE_INSTANT) {
-      console.log("[CallHandler] non-instant accept");
-      DebugLogger.addLog(
-        "accepted call",
-        "NOTICE",
-        "handleAppAcceptCall",
-        "Instant one-on-one only"
-      );
-      return;
-    }
-    if (callerId === undefined || callerId === "") {
-      console.log("[CallHandler] accept missing callerId");
-      DebugLogger.addLog(
-        "accepted call",
-        "CRITICAL",
-        "handleAppAcceptCall",
-        "Missing callerId"
-      );
-      return;
-    }
-    if (calleeId === undefined || calleeId === "") {
-      console.log("[CallHandler] accept missing calleeId");
-      DebugLogger.addLog(
-        "accepted call",
-        "CRITICAL",
-        "handleAppAcceptCall",
-        "Missing calleeId"
-      );
-      return;
-    }
-    if (calleeRole === undefined || calleeRole === "") {
-      console.log("[CallHandler] accept missing role");
-      DebugLogger.addLog(
-        "accepted call",
-        "CRITICAL",
-        "handleAppAcceptCall",
-        "Missing role"
-      );
-      return;
-    }
-    if (CallHandler._invite.callerRole === null) {
-      console.log("[CallHandler] missing stored callerRole from invite");
-      DebugLogger.addLog(
-        "accepted call",
-        "CRITICAL",
-        "handleAppAcceptCall",
-        "Missing caller role from invite"
-      );
-      return;
-    }
-
-    // Set current side to callee
-    CallHandler._currentSide = "callee";
-    
-    // 🔔 UI (callee) → accepted call
-    CallHandler.dipatchUI("callee:callAccepted", "none", {
-      callerId,
-      calleeId,
-      role: calleeRole,
-    });
-
-    console.log("[CallHandler] SELF_STOP_RING to callee");
-    SocketHandler.sendSocketMessage({
-      flag: CallHandler.FLAGS.SELF_STOP_RING,
-      payload: { to: calleeId, calleeId },
-      schema: CallHandler.SCHEMA.selfStop,
-    });
-
-    console.log("[CallHandler] CALL_ACCEPTED to caller");
-    SocketHandler.sendSocketMessage({
-      flag: CallHandler.FLAGS.CALL_ACCEPTED,
-      payload: { to: callerId, callerId, calleeId },
-      schema: CallHandler.SCHEMA.accept,
-    });
-
-    console.log("[CallHandler] local dispatch CALL_ACCEPTED");
-    document.dispatchEvent(
-      new CustomEvent(CallHandler.FLAGS.CALL_ACCEPTED, {
-        detail: { callerId, calleeId },
-      })
-    );
-
-    DebugLogger.addLog("accepted call", "NOTICE", "handleAppAcceptCall", "Call accepted");
-    DebugLogger.addLog(
-      "setuping up",
-      "NOTICE",
-      "handleAppAcceptCall",
-      "Step 1: Creating meeting in database..."
-    );
-
-    console.log("[CallHandler] meeting ops begin");
-    
-    // Notify caller: Starting DB creation
-    SocketHandler.sendSocketMessage({
-      flag: "meeting:status",
-      payload: {
-        to: callerId,
-        status: "creating_db",
-        message: "Creating meeting in database...",
-      },
-    });
-    
-    CallHandler.getMeetingID(calleeId, calleeRole)
-      .then((meetingId) => {
-        console.log("[CallHandler] DB meeting id", meetingId);
-        DebugLogger.addLog(
-          "setuping up",
-          "NOTICE",
-          "handleAppAcceptCall",
-          "Step 2: Creating Chime meeting & requesting permissions..."
-        );
-        
-        // Notify caller: DB created, creating Chime
-        SocketHandler.sendSocketMessage({
-          flag: "meeting:status",
-          payload: {
-            to: callerId,
-            status: "creating_chime",
-            message: "Database meeting created. Creating Chime meeting...",
-            meetingId: meetingId,
-          },
-        });
-        
-        // Check if we need to request permissions now or wait for manual join
-        const mediaType = CallHandler._invite.callType || "video";
-        if (CallHandler.CALLEE_MANUAL_JOIN_ENABLED) {
-          // Manual join: don't request permissions now, wait for Join button click
-          return CallHandler.createChimeMeeting(meetingId, calleeId, calleeRole)
-            .then((chimeData) => ({ meetingId, chimeId: chimeData.chimeMeetingId, fullMeeting: chimeData.fullMeeting }));
-        } else {
-          // Auto-join: request permissions now
-          return Promise.all([
-            CallHandler.createChimeMeeting(meetingId, calleeId, calleeRole),
-            CallHandler.ensureCamMicReady(mediaType)
-          ]).then(([chimeData]) => ({ meetingId, chimeId: chimeData.chimeMeetingId, fullMeeting: chimeData.fullMeeting }));
-        }
-      })
-      .then(({ meetingId, chimeId, fullMeeting }) => {
-        console.log("[CallHandler] MEETING_READY to caller (with roles)", {
-          meetingId,
-          callerRole: CallHandler._invite.callerRole,
-          calleeRole,
-        });
-
-        DebugLogger.addLog(
-          "setuping up",
-          "NOTICE",
-          "handleAppAcceptCall",
-          "Step 3: Meeting created. Notifying caller..."
-        );
-        DebugLogger.addLog(
-          "setuping up",
-          "NOTICE",
-          "handleAppAcceptCall",
-          `Sending to caller: DB ID = ${meetingId}, Chime ID = ${chimeId}`
-        );
-
-        SocketHandler.sendSocketMessage({
-          flag: CallHandler.FLAGS.MEETING_READY,
-          payload: {
-            to: callerId,
-            meetingId,
-            callerId,
-            calleeId,
-            callerRole: CallHandler._invite.callerRole,
-            calleeRole,
-            chimeMeetingId: chimeId,
-            dbMeetingId: meetingId,
-          },
-          schema: CallHandler.SCHEMA.meetingReady,
-        });
-
-        // 🔔 UI (callee) → check if manual join is enabled
-        if (CallHandler.CALLEE_MANUAL_JOIN_ENABLED) {
-          // Callee needs to manually click Join to join with cam/mic
-          CallHandler.dipatchUI("callee:connected", "none", {
-            meetingId,
-            userId: calleeId,
-            role: calleeRole,
-          });
-          
-          // Store join info for when the Join button is clicked
-          CallHandler._pendingCalleeJoin = {
-            meetingId,
-            calleeId: calleeId,
-            calleeRole,
-            chimeId,
-            callType: CallHandler._invite.callType,
-            fullMeeting,
-          };
-        } else {
-          // Auto-join like before
-          DebugLogger.addLog(
-            "connecting",
-            "NOTICE",
-            "handleAppAcceptCall",
-            "Step 4: Joining meeting..."
-          );
-          console.log(
-            "[CallHandler] callee joinChimeMeeting with role",
-            calleeRole
-          );
-          return CallHandler.joinChimeMeeting(
-            meetingId,
-            calleeId,
-            calleeRole,
-            chimeId,
-            CallHandler._invite.callType,
-            fullMeeting
-          ).then(() => {
-            console.log("[CallHandler] dispatch MEETING_CONNECT (callee)");
-            document.dispatchEvent(
-              new CustomEvent(CallHandler.FLAGS.MEETING_CONNECT, {
-                detail: {
-                  meetingId,
-                  userId: calleeId,
-                  role: calleeRole,
-                  chimeMeetingId: chimeId,
-                },
-              })
-            );
-          });
-        }
-      })
-      .catch((err) => {
-        console.error("[CallHandler] callee meeting flow error", err);
-        CallHandler._inCallOrConnecting = false; // Reset so user can try again
-        CallHandler.dipatchUI("callee:terminated", "error", {
-          message: err && err.message ? err.message : "Unknown error",
-        });
-        DebugLogger.addLog(
-          "terminated",
-          "CRITICAL",
-          "handleAppAcceptCall",
-          `Meeting Error: ${err && err.message ? err.message : "Unknown error"}`
-        );
-        SocketHandler.sendSocketMessage({
-          flag: CallHandler.FLAGS.MEETING_PROBLEM,
-          payload: {
-            to: callerId,
-            meetingId: "unknown",
-            callerId,
-            calleeId,
-            message: err && err.message ? err.message : "Unknown error",
-          },
-          schema: CallHandler.SCHEMA.meetingProblem,
-        });
-      });
+    // Route to handleTerminateClick() - it will handle all termination logic
+    console.log("%c[CallHandler] Routing to handleTerminateClick()", 'background: #17a2b8; color: white; padding: 5px;');
+    CallHandler.handleTerminateClick();
   }
 
   static handleAppRejectCall(e) {
@@ -2044,6 +3110,36 @@ static dipatchUI(state, substate = "none", payload = {}) {
       console.log("[CallHandler] incoming missing body");
       return;
     }
+    
+    // Check blocklist FIRST - before any processing
+    const callerId = body.callerId || body.from;
+    if (callerId && CallHandler.isUserBlocked(callerId)) {
+      console.log(`%c[BLOCKLIST] 🚫 Blocked incoming call from ${callerId} - no UI shift, no processing`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      DebugLogger.addLog("blocklist", "NOTICE", "handleSocketIncomingCall", `Blocked incoming call from ${callerId}`);
+      return; // Block completely - no UI, no processing
+    }
+    
+    // Reset UI state tracking for new incoming call (clear terminated flag) - MUST be early, before any guard checks
+    CallHandler.resetUIState(true);
+    
+    // Reset _inCallOrConnecting flag for new incoming call (callee can receive new call)
+    CallHandler._inCallOrConnecting = false;
+    console.log("[CallHandler] Reset _inCallOrConnecting for new incoming call");
+    
+    // CRITICAL: Clear old pending join to prevent joining old meetings
+    if (CallHandler._pendingCalleeJoin) {
+      console.log(`%c[CALL ID] 🧹 Clearing old pending join for call ${CallHandler._pendingCalleeJoin.callId}`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+      CallHandler._pendingCalleeJoin = null;
+    }
+    
+    // Set call ID from incoming message (for callee)
+    if (body.callId) {
+      CallHandler.setCallId(body.callId);
+      console.log(`%c[CALL ID] 📥 Received incoming call with ID: ${body.callId}`, 'background: #007bff; color: white; font-weight: bold; padding: 5px;');
+    } else {
+      console.warn(`%c[CALL ID] ⚠️ Incoming call missing callId`, 'background: #ffc107; color: black; padding: 5px;');
+    }
+    
     if (body.callType !== CallHandler.TYPE_INSTANT) {
       console.log("[CallHandler] ignore non-instant incoming");
       return;
@@ -2062,7 +3158,15 @@ static dipatchUI(state, substate = "none", payload = {}) {
     }
 
     // === Busy guard: if already in setup/connecting/connected, alert + auto-decline ===
-    if (CallHandler._inCallOrConnecting === true) {
+    // BUT: Don't block if we're in terminated state (terminated means we're NOT in a call)
+    const isTerminatedState = CallHandler._currentUIState && (
+      CallHandler._currentUIState.includes('terminated') ||
+      CallHandler._currentUIState.includes('rejected') ||
+      CallHandler._currentUIState.includes('declined') ||
+      CallHandler._currentUIState === 'ended'
+    );
+    
+    if (CallHandler._inCallOrConnecting === true && !isTerminatedState) {
       DebugLogger.addLog(
         "receiving call",
         "NOTICE",
@@ -2077,7 +3181,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
           to: body.callerId,
           callerId: body.callerId,
           calleeId: body.calleeId,
-          reason: "in_another_call",
+          reason: CallHandler.TERMINATION_REASONS.ON_ANOTHER_CALL,
         },
         schema: CallHandler.SCHEMA.decline,
       });
@@ -2107,16 +3211,22 @@ static dipatchUI(state, substate = "none", payload = {}) {
       window.mockCallData.currentUserRole = calleeRole;
       window.mockCallData.currentUserSide = "callee";
       
-      // Swap: current user is the callee, target user is the caller
+      // Callee side: use target from payload (callerData), NOT from DOM
+      // Swap: current user is the callee, target user is the caller (from payload)
       window.mockCallData.currentUser = body.calleeData || window.mockCallData.currentUser;
       window.mockCallData.targetUser = body.callerData || window.mockCallData.targetUser;
       
       console.log(`[CallHandler] [Callee] mockCallData populated - Caller role: ${body.role}, Callee role: ${calleeRole}`, window.mockCallData);
+      console.log(`[CallHandler] [Callee] Using targetUser from payload (callerData):`, body.callerData);
+      
+      // Sync mockCallData to Vue call settings
+      if (window.vueApp && typeof window.vueApp.syncMockDataToVueSettings === 'function') {
+        window.vueApp.syncMockDataToVueSettings();
+      }
     }
     
-    // Initialize CamMic permissions system for callee
-    console.log('[CallHandler] [Callee] Initializing CamMic permissions system');
-    window.dispatchEvent(new CustomEvent('CamMic:Init'));
+    // Initialize CamMic permissions system (first call only)
+    CallHandler._ensureCamMicInitialized();
     
     // Set current side to callee
     CallHandler._currentSide = "callee";
@@ -2140,9 +3250,6 @@ static dipatchUI(state, substate = "none", payload = {}) {
       })
     );
 
-    // Reset UI state tracking for new incoming call
-    CallHandler.resetUIState();
-    
     // 🔔 UI (callee) → incoming - determine if audio or video call
     const mediaType = body.mediaType || "video";
     const incomingState = mediaType === "audio" ? "callee:incomingAudioCall" : "callee:incomingVideoCall";
@@ -2176,15 +3283,64 @@ static dipatchUI(state, substate = "none", payload = {}) {
 
     // 25s TIMEOUT → ENDS FLOW FOR BOTH SIDES (callee side timer)
     CallHandler.clearCalleeRingTimer();
-    console.log("[CallHandler] start ring timeout 25s (callee)");
+    console.log("[CallHandler] start ring timeout 2min (callee)");
+    const currentCallIdForCallee = CallHandler._currentCallId; // Store call ID in closure
     CallHandler._calleeRingTimerId = setTimeout(() => {
-      // ...
+      // Check if call ID still matches (call might have changed)
+      if (CallHandler._currentCallId !== currentCallIdForCallee) {
+        console.log("[CallHandler] Callee timeout: call ID changed, ignoring timeout");
+        return;
+      }
+      
+      console.log("[CallHandler] CALLEE ring timeout → terminate immediately");
+      CallHandler.clearCalleeRingTimer();
+      CallHandler._inCallOrConnecting = false;
+      
+      CallHandler.dipatchUI("callee:terminated", CallHandler.TERMINATION_REASONS.NO_ANSWER, {
+        callerId: body.callerId,
+        calleeId: body.calleeId,
+      });
+      
+      DebugLogger.addLog(
+        "terminated",
+        "NOTICE",
+        "handleSocketIncomingCall",
+        "No answer (timeout)"
+      );
     }, CallHandler._ringTimeoutMs);
   }
 
   static handleSocketAccepted(body) {
     DebugLogger.addLog("calling", "NOTICE", "handleSocketAccepted", "Call accepted by remote", body);
     console.log("[CallHandler] SOCKET call:accepted", body);
+    
+    // Cancel grace period timer if active (caller received accepted message during grace period)
+    if (CallHandler._callerGraceTimerId !== null) {
+      console.log("[CallHandler] ✅ Call accepted during grace period - canceling timeout termination");
+      CallHandler.clearCallerGraceTimer();
+    }
+    
+    // Prevent call:accepted if call has already ended (terminated, rejected, declined, etc)
+    // Check both persistent flag and current state
+    const isTerminated = CallHandler._isCallTerminated || (CallHandler._currentUIState && (
+      CallHandler._currentUIState.includes('terminated') ||
+      CallHandler._currentUIState.includes('rejected') ||
+      CallHandler._currentUIState.includes('declined') ||
+      CallHandler._currentUIState === 'ended'
+    ));
+    
+    if (isTerminated) {
+      console.log(`%c[CallHandler] 🚫 Ignoring call:accepted - call already terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+        isCallTerminated: CallHandler._isCallTerminated,
+        currentState: CallHandler._currentUIState
+      });
+      DebugLogger.addLog("terminated", "NOTICE", "handleSocketAccepted", "Ignoring delayed call:accepted - call terminated", {
+        isCallTerminated: CallHandler._isCallTerminated,
+        state: CallHandler._currentUIState
+      });
+      return;
+    }
+    
     if (!body) {
       console.log("[CallHandler] accepted missing body");
       return;
@@ -2204,6 +3360,17 @@ static dipatchUI(state, substate = "none", payload = {}) {
     // Set current side to caller
     CallHandler._currentSide = "caller";
     
+    // Guard: Only dispatch if not already in caller:callAccepted state
+    if (CallHandler._currentUIState !== 'caller:callAccepted') {
+      CallHandler.dipatchUI("caller:callAccepted", "none", {
+        callerId: body.callerId,
+        calleeId: body.calleeId,
+        side: "caller",
+      });
+    } else {
+      console.log("[CallHandler] Already in caller:callAccepted state, skipping duplicate dispatch");
+    }
+    
     // Reset chimeHandler alerts for new call
     if (typeof chimeHandler !== 'undefined') {
       chimeHandler._hasShownJoinedAlert = false;
@@ -2212,11 +3379,16 @@ static dipatchUI(state, substate = "none", payload = {}) {
     }
 
     // 🔔 UI (caller) → accepted call, setting up (waiting for meeting)
-    CallHandler.dipatchUI("caller:callAccepted", "none", {
-      callerId: body.callerId,
-      calleeId: body.calleeId,
-      side: "caller",
-    });
+    // Guard: Only dispatch if not already in caller:callAccepted state
+    if (CallHandler._currentUIState !== 'caller:callAccepted') {
+      CallHandler.dipatchUI("caller:callAccepted", "none", {
+        callerId: body.callerId,
+        calleeId: body.calleeId,
+        side: "caller",
+      });
+    } else {
+      console.log("[CallHandler] Already in caller:callAccepted state, skipping duplicate dispatch");
+    }
     CallHandler._inCallOrConnecting = true; // NEW
     DebugLogger.addLog(
       "accepted call",
@@ -2286,6 +3458,9 @@ static dipatchUI(state, substate = "none", payload = {}) {
     CallHandler.clearCalleeRingTimer();
     CallHandler._inCallOrConnecting = false; // NEW
 
+    // Clear all call-related state (database IDs, meeting info, etc.)
+    CallHandler.clearAllCallState();
+
     DebugLogger.addLog(
       "terminated",
       "NOTICE",
@@ -2303,7 +3478,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
       })
     );
     // 🔔 UI (caller) → timeout
-    CallHandler.dipatchUI("caller:terminated", "timeout", {
+    CallHandler.dipatchUI("caller:terminated", CallHandler.TERMINATION_REASONS.NO_ANSWER, {
       callerId: body ? body.callerId : undefined,
       calleeId: body ? body.calleeId : undefined,
     });
@@ -2314,13 +3489,69 @@ static dipatchUI(state, substate = "none", payload = {}) {
     console.log("[CallHandler] SOCKET call:cancelled", body);
     CallHandler.clearCallerRingTimer();
     CallHandler.clearCalleeRingTimer();
+    CallHandler._inCallOrConnecting = false;
+    
+    // DIRECT CHECK: Determine receiver's role from current UI state
+    const isReceiverCaller = CallHandler._currentUIState && CallHandler._currentUIState.startsWith('caller:');
+    const isReceiverCallee = CallHandler._currentUIState && CallHandler._currentUIState.startsWith('callee:');
+    
+    // Get reason from socket message
+    const reason = body && body.reason ? body.reason : null;
+    
+    let substate = 'cancelled';
+    let terminatedState = 'callee:terminated';
+    
+    if (isReceiverCaller) {
+      // Caller received cancellation from callee
+      terminatedState = 'caller:terminated';
+      if (reason === 'declined') {
+        // Callee declined before accepting
+        substate = 'declined';
+      } else if (reason === 'ended') {
+        // Callee ended after accepting
+        substate = 'cancelled';
+      } else {
+        // Fallback: check caller's state
+        const isCallWaiting = CallHandler._currentUIState === 'caller:callWaiting';
+        substate = isCallWaiting ? 'declined' : 'cancelled';
+      }
+      console.log("[CallHandler] Caller received cancellation from callee", { reason, substate, callerState: CallHandler._currentUIState });
+    } else if (isReceiverCallee) {
+      // Callee received cancellation from caller
+      terminatedState = 'callee:terminated';
+      if (reason === 'cancelled') {
+        // Caller cancelled before callee answered
+        substate = 'cancelled';
+      } else if (reason === 'ended') {
+        // Caller ended after callee answered
+        substate = 'cancelled';
+      } else {
+        // Fallback: check callee's state
+        const isIncomingCall = CallHandler._currentUIState === 'callee:incomingVideoCall' || 
+                              CallHandler._currentUIState === 'callee:incomingAudioCall';
+        substate = isIncomingCall ? 'cancelled' : 'cancelled';
+      }
+      console.log("[CallHandler] Callee received cancellation from caller", { reason, substate, calleeState: CallHandler._currentUIState });
+    } else {
+      // No state detected - use default
+      console.warn("[CallHandler] Could not determine receiver role from state", { currentState: CallHandler._currentUIState });
+      substate = 'cancelled';
+    }
+    
+    // Clear all call-related state
+    CallHandler.clearAllCallState();
+    
+    // Reset Vue call settings (including cam/mic)
+    if (window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
+      window.vueApp.resetCallSettings();
+    }
+    
     DebugLogger.addLog(
       "terminated",
       "NOTICE",
       "handleSocketCancelled",
-      "Caller cancelled"
+      `Call cancelled - receiver: ${isReceiverCaller ? 'caller' : isReceiverCallee ? 'callee' : 'unknown'}, substate: ${substate}`
     );
-    console.log("[CallHandler] dispatch call:ended {reason:'hangup'}");
     document.dispatchEvent(
       new CustomEvent(CallHandler.FLAGS.CALL_ENDED, {
         detail: {
@@ -2330,8 +3561,7 @@ static dipatchUI(state, substate = "none", payload = {}) {
         },
       })
     );
-    // 🔔 UI (callee) → cancelled by caller
-    CallHandler.dipatchUI("callee:terminated", "cancelled", {
+    CallHandler.dipatchUI(terminatedState, substate, {
       callerId: body ? body.callerId : undefined,
       calleeId: body ? body.calleeId : undefined,
     });
@@ -2379,15 +3609,20 @@ static dipatchUI(state, substate = "none", payload = {}) {
     )}?user=${encodeURIComponent(body.callerId)}&role=${encodeURIComponent(
       body.callerRole
     )}`;
-    CallHandler.dipatchUI("caller:callAccepted", "none", {
-      side: "caller",
-      meetingId: body.meetingId,
-      joinUrl,
-      callerId: body.callerId,
-      calleeId: body.calleeId,
-      callerRole: body.callerRole,
-      calleeRole: body.calleeRole,
-    });
+    // Guard: Only dispatch if not already in caller:callAccepted state
+    if (CallHandler._currentUIState !== 'caller:callAccepted') {
+      CallHandler.dipatchUI("caller:callAccepted", "none", {
+        side: "caller",
+        meetingId: body.meetingId,
+        joinUrl,
+        callerId: body.callerId,
+        calleeId: body.calleeId,
+        callerRole: body.callerRole,
+        calleeRole: body.calleeRole,
+      });
+    } else {
+      console.log("[CallHandler] Already in caller:callAccepted state, skipping duplicate dispatch");
+    }
 
     // The CALLER joins with callerRole from payload
     DebugLogger.addLog(
@@ -2433,13 +3668,18 @@ static dipatchUI(state, substate = "none", payload = {}) {
       // If we were in waiting state, return to callAccepted
       if (CallHandler._currentUIState === 'caller:waitingForCamMicPermissions') {
         console.log('[CallHandler] [Caller] [FIX v1.1] 📺 Current state is waitingForCamMicPermissions - returning to callAccepted');
-        CallHandler.dipatchUI("caller:callAccepted", "none", {
-          callerId: body.callerId,
-          calleeId: body.calleeId,
-          callerRole: body.callerRole,
-          calleeRole: body.calleeRole,
-        });
-        console.log('[CallHandler] [Caller] [FIX v1.1] ✅ UI transitioned back to caller:callAccepted');
+        // Guard: Only dispatch if not already in caller:callAccepted state
+        if (CallHandler._currentUIState !== 'caller:callAccepted') {
+          CallHandler.dipatchUI("caller:callAccepted", "none", {
+            callerId: body.callerId,
+            calleeId: body.calleeId,
+            callerRole: body.callerRole,
+            calleeRole: body.calleeRole,
+          });
+          console.log('[CallHandler] [Caller] [FIX v1.1] ✅ UI transitioned back to caller:callAccepted');
+        } else {
+          console.log('[CallHandler] [Caller] [FIX v1.1] ⏭️ Already in caller:callAccepted state, skipping duplicate dispatch');
+        }
       } else {
         console.log('[CallHandler] [Caller] [FIX v1.1] ⏭️ Current state is NOT waitingForCamMicPermissions, skipping UI change. Current state:', CallHandler._currentUIState);
       }
@@ -2961,6 +4201,19 @@ static dipatchUI(state, substate = "none", payload = {}) {
     }
   }
 
+  static clearCallerGraceTimer() {
+    if (CallHandler._callerGraceTimerId !== null) {
+      console.log(
+        "[CallHandler] clearing caller grace period timer",
+        CallHandler._callerGraceTimerId
+      );
+      clearTimeout(CallHandler._callerGraceTimerId);
+      CallHandler._callerGraceTimerId = null;
+    } else {
+      console.log("[CallHandler] no caller grace period timer to clear");
+    }
+  }
+
   // ----------------------------------------------------------
   // Handle manual callee join button click
   // ----------------------------------------------------------
@@ -2972,7 +4225,23 @@ static dipatchUI(state, substate = "none", payload = {}) {
       return;
     }
     
-    const { meetingId, calleeId, calleeRole, chimeId, callType, fullMeeting } = CallHandler._pendingCalleeJoin;
+    // VALIDATE CALL ID - prevent joining old meetings
+    const { callId, meetingId, calleeId, calleeRole, chimeId, callType, fullMeeting } = CallHandler._pendingCalleeJoin;
+    
+    if (callId !== CallHandler._currentCallId) {
+      console.error("[CallHandler] Call ID mismatch - cannot join old meeting", {
+        pendingCallId: callId,
+        currentCallId: CallHandler._currentCallId
+      });
+      DebugLogger.addLog("connecting", "CRITICAL", "handleManualCalleeJoin", "Call ID mismatch - rejecting join attempt", {
+        pendingCallId: callId,
+        currentCallId: CallHandler._currentCallId
+      });
+      CallHandler._pendingCalleeJoin = null;
+      return;
+    }
+    
+    console.log("[CallHandler] Call ID validated - proceeding with join", { callId });
     
     // Clear pending join info
     CallHandler._pendingCalleeJoin = null;
@@ -3264,6 +4533,182 @@ static dipatchUI(state, substate = "none", payload = {}) {
     }
     
     console.log('[CallHandler] [Socket] Call ended for this user due to grace period failure - Reason:', reason);
+  }
+
+  /**
+   * Modularized Camera/Microphone Permissions Orchestration Flow
+   * 
+   * Handles the complete async flow for requesting cam/mic permissions:
+   * 1. Transitions to waiting state (freezes UI)
+   * 2. Listens for external state changes (call terminated, joined, etc)
+   * 3. Dispatches orchestration event
+   * 4. Returns to appropriate state based on what happened
+   * 
+   * @param {string} callerIdVal - Caller ID
+   * @param {string} calleeIdVal - Callee ID  
+   * @param {string} calleeRole - Role (caller/callee)
+   * @param {string} mediaType - Type of call (video/audio)
+   * @param {string} returnState - State to return to if orchestration succeeds (e.g. "caller:callAccepted", "callee:callAccepted")
+   * @returns {Promise<void>}
+   */
+  static async orchestrateCamMicPermissionsFlow(callerIdVal, calleeIdVal, calleeRole, mediaType = 'video', returnState = 'caller:callAccepted') {
+    console.log('[CallHandler] [CamMicFlow] [Start]', { callerIdVal, calleeIdVal, calleeRole, mediaType, returnState });
+    
+    const isVideoCall = mediaType === 'video';
+    
+    // Step 0: Ensure cam/mic init
+    console.log('[CallHandler] [CamMicFlow] [STEP 0: INIT] Dispatching CamMic:Init');
+    window.dispatchEvent(new CustomEvent('CamMic:Init'));
+    
+    // Store returnState for later use (will be used when permissions are granted)
+    const nextStateAfterCamMicPermissions = returnState;
+    
+    // Step 1: Guard against multiple transitions to waiting state
+    if (CallHandler._isInCamMicWaiting) {
+      console.log('[CallHandler] [CamMicFlow] [STEP 1: GUARD] Already in waiting state - skipping transition');
+      return;
+    }
+    
+    // Set guard flag BEFORE transitioning
+    CallHandler._isInCamMicWaiting = true;
+    console.log('[CallHandler] [CamMicFlow] [STEP 1: GUARD] Guard flag set - transitioning to waiting state');
+    
+    // Step 2: Transition to waiting state (only if guard allows)
+    const waitingState = CallHandler._currentSide === 'callee' ? 'callee:waitingForCamMicPermissions' : 'caller:waitingForCamMicPermissions';
+    console.log('[CallHandler] [CamMicFlow] [STEP 2: TRANSITION] Transitioning to', waitingState);
+    CallHandler.dipatchUI(waitingState, 'none', {
+      callerId: callerIdVal,
+      calleeId: calleeIdVal,
+      role: calleeRole,
+    });
+    
+    // Step 2: Setup listener for external state changes while waiting
+    let externalStateChanged = null;
+    const stateChangeListener = (event) => {
+      const newState = event.detail?.state;
+      console.log('[CallHandler] [CamMicFlow] ⚠️ External state change detected:', newState);
+      
+      // Listen for call termination or other state changes
+      if (newState && newState !== waitingState) {
+        externalStateChanged = newState;
+        console.log('[CallHandler] [CamMicFlow] State will be:', externalStateChanged, 'after permissions complete');
+      }
+    };
+    
+    document.addEventListener('chime-ui::state', stateChangeListener);
+    
+    // Step 3: Setup listener for permissions resolved (from permission watcher)
+    const onPermissionsResolved = (ev) => {
+      const detail = ev.detail || {};
+      console.log('[CallHandler] [CamMicFlow] 🔔 CamMic:UI:PermissionsResolved:', detail);
+      
+      // Use nextState from event detail if provided, otherwise use stored returnState
+      const resolvedNextState = detail.nextState || nextStateAfterCamMicPermissions;
+      const finalState = externalStateChanged || resolvedNextState;
+      
+      console.log('[CallHandler] [CamMicFlow] ✅ Permissions resolved - returning to:', finalState);
+      
+      // Clear guard flag
+      CallHandler._isInCamMicWaiting = false;
+      
+      CallHandler.dipatchUI(finalState, 'none', {
+        callerId: callerIdVal,
+        calleeId: calleeIdVal,
+        role: calleeRole,
+      });
+    };
+    
+    window.addEventListener('CamMic:UI:PermissionsResolved', onPermissionsResolved);
+    
+    // Step 4: Setup listener for orchestration completion (fallback)
+    let orchestrationComplete = false;
+    const onOrchestrationComplete = (ev) => {
+      orchestrationComplete = true;
+      const detail = ev.detail || {};
+      console.log('[CallHandler] [CamMicFlow] 🔔 CamMic:Orchestrate:Complete:', detail);
+      
+      // Check permission states
+      const camera = detail.permissions?.camera || 'unknown';
+      const microphone = detail.permissions?.microphone || 'unknown';
+      
+      console.log('[CallHandler] [CamMicFlow] Permissions:', { camera, microphone });
+      
+      // If permissions denied, stay in waiting state
+      if ((isVideoCall && camera === 'denied') || (!isVideoCall && microphone === 'denied')) {
+        console.log('[CallHandler] [CamMicFlow] ❌ Required permission denied');
+        alert('❌ Permission denied. Please enable in browser settings and try again.');
+        // Clear guard flag on denial
+        CallHandler._isInCamMicWaiting = false;
+        return;
+      }
+      
+      // Permissions granted - return to appropriate state
+      const finalState = externalStateChanged || nextStateAfterCamMicPermissions;
+      console.log('[CallHandler] [CamMicFlow] ✅ Permissions granted - returning to:', finalState);
+      
+      // Clear guard flag
+      CallHandler._isInCamMicWaiting = false;
+      
+      CallHandler.dipatchUI(finalState, 'none', {
+        callerId: callerIdVal,
+        calleeId: calleeIdVal,
+        role: calleeRole,
+      });
+    };
+    
+    window.addEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+    
+    try {
+      // Step 5: Dispatch orchestration based on call type (with returnState in detail)
+      if (isVideoCall) {
+        console.log('[CallHandler] [CamMicFlow] [STEP 5: DISPATCH] Dispatching CamMic:Orchestrate:Both:NoPreview (video call) with returnState:', nextStateAfterCamMicPermissions);
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview', {
+          detail: { returnState: nextStateAfterCamMicPermissions }
+        }));
+      } else {
+        console.log('[CallHandler] [CamMicFlow] [STEP 5: DISPATCH] Dispatching CamMic:Orchestrate:Microphone (audio call) with returnState:', nextStateAfterCamMicPermissions);
+        window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone', {
+          detail: { returnState: nextStateAfterCamMicPermissions }
+        }));
+      }
+      
+      console.log('[CallHandler] [CamMicFlow] ⏳ Waiting for orchestration to complete...');
+      
+      // Wait for orchestration to complete (with timeout)
+      const timeout = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Orchestration timeout')), 30000)
+      );
+      const completion = new Promise((resolve) => {
+        const checkComplete = setInterval(() => {
+          if (orchestrationComplete) {
+            clearInterval(checkComplete);
+            resolve();
+          }
+        }, 100);
+      });
+      
+      await Promise.race([completion, timeout]);
+      
+    } catch (error) {
+      console.error('[CallHandler] [CamMicFlow] ❌ Error:', error);
+      // Return to previous state on error
+      const finalState = externalStateChanged || nextStateAfterCamMicPermissions;
+      
+      // Clear guard flag on error
+      CallHandler._isInCamMicWaiting = false;
+      
+      CallHandler.dipatchUI(finalState, 'none', {
+        callerId: callerIdVal,
+        calleeId: calleeIdVal,
+        role: calleeRole,
+      });
+    } finally {
+      // Cleanup listeners
+      document.removeEventListener('chime-ui::state', stateChangeListener);
+      window.removeEventListener('CamMic:UI:PermissionsResolved', onPermissionsResolved);
+      window.removeEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+      console.log('[CallHandler] [CamMicFlow] 🧹 Listeners cleaned up');
+    }
   }
 }
 

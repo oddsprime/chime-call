@@ -10,8 +10,9 @@
           avatarSrc: { type: String, default: 'https://fansocial-user-media.s3-accelerate.amazonaws.com/user-869/images/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg.png' },
           loaderSrc: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/green-loader-2.svg' },
           heading: { type: String, default: 'Call Accepted!' },
+          endCallIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/Communication.svg' },
         },
-        emits: ['accept', 'decline', 'options'],
+        emits: ['accept', 'decline', 'options', 'end-call'],
         template: `
           <div
             
@@ -47,6 +48,14 @@
                 <span class="text-xs leading-normal text-[#98A2B3]">{{ calleHandle }}</span>
               </div>
             </div>
+
+             <!-- cut-call -->
+              <end-call-button
+                :icon="endCallIcon"
+                btn-size="w-12 h-12"
+                img-size="w-[2.2rem] h-[2.2rem]"
+                @click="$emit('end-call')"
+              ></end-call-button>
           </div>
         `,
       });

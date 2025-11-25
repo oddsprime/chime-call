@@ -11,6 +11,8 @@
   <!-- Relative paths for local files -->
   <!-- Debug Logger (must load first to hijack alerts) -->
   <script src="./debugLogger.js"></script>
+  <!-- Chime Settings Utility (must load early for global access) -->
+  <script src="./chimeSettingsUtility.js"></script>
   <!-- SocketHandler must be from external source (keep absolute) -->
   <script src="https://playground.codelinden.com/webSocket/SocketHandler.js"></script>
   <!-- Local files - relative paths -->
@@ -35,6 +37,13 @@
 
   <!-- NEW COMPREHENSIVE VUE TEMPLATES - STYLES AND FONTS -->
   <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap" rel="stylesheet" />
+  
+  <!-- Spinner animation for video sync loading -->
+  <style>
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  </style>
 
   <!-- Final Template Flow is driven by the ORIGINAL Vue instance (state/substate). -->
   <!-- Load template/component bundles for reuse, but do NOT mount a second Vue app. -->
@@ -67,6 +76,7 @@
   <script src="components/prejoin/vueComponentsBackgroundsEffects.js" defer></script>
   <script src="components/prejoin/vueComponentsSettingsPanel.js" defer></script>
   <script src="components/prejoin/vueComponentsMobileJoinButton.js" defer></script>
+  <script src="components/prejoin/CamMicTooltip.js" defer></script>
   <script src="components/vueComponentTemplateChimeCalleeConnected.js" defer></script>
 
   <!-- Bottom Panel Buttons -->
@@ -79,16 +89,20 @@
   <script src="components/controlPanelbuttons/vueComponentCameraButton.js" defer></script>
   <script src="components/controlPanelbuttons/vueComponentMicButton.js" defer></script>
   <script src="components/controlPanelbuttons/EndCallButton.js" defer></script>
+  <script src="components/controlPanelbuttons/GlobalTerminateButton.js" defer></script>
 
   <!-- Calling Flow Components -->
   <script src="components/callingStep/IncomingCall.js"></script>
+  <script src="components/LoadingSpinner.js"></script>
   <script src="components/callingStep/CallingCard.js"></script>
   <script src="components/callingStep/CallAcceptedCard.js"></script>
   <script src="components/callingStep/CallAccepetedCardCreator.js"></script>
   <script src="components/callingStep/CallPermissionCard.js"></script>
   <script src="components/callingStep/CallRejected.js"></script>
+  <script src="components/callingStep/CallEnded.js"></script>
   <script src="components/callingStep/CallMissed.js"></script>
   <script src="components/callingStep/WaitingToJoin.js"></script>
+  <script src="components/vueComponentAvatar.js"></script>
 
 
   <style>
@@ -128,6 +142,7 @@
     .bg-yellow1{
         background: linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0%, rgba(0, 0, 0, 0.10) 100%), linear-gradient(0deg, rgba(255, 205, 41, 0.75) -3.06%, rgba(255, 205, 41, 0.00) 117.35%);
       }
+      
 
 
     /* Reaction animations */
@@ -184,9 +199,15 @@
       }
     }
   </style>
+
+<link rel="preload" href="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/camera-icon.svg" as="image">
+<link rel="preload" href="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/disableCamera.svg" as="image">
+
 </head>
 
 <body>
+
+
   <!-- ===== Vue 3 bridge (passive listener) ===== -->
   <script src="https://unpkg.com/vue@3.4.31/dist/vue.global.prod.js"></script>
 
@@ -208,7 +229,15 @@
         'grid-cols-[1fr_0px] md:grid-cols-[1fr_auto]': !ChimeCallSettings.callChatStatus || isMobile
       }">
       <div class="relative w-full h-screen" data-chime-templates>
-        <div data-video-container class="w-full h-full absolute">
+        <div
+          data-video-container
+          class="h-full absolute lg:p-2"
+          :class="{
+            'w-full lg:[width:calc(100%-405px)]': ChimeCallSettings.callChatStatus,
+            'w-full': !ChimeCallSettings.callChatStatus || isMobile
+          }"
+
+        >
           <div id="reaction-layer" class="absolute w-full h-full inset-0 pointer-events-none z-[3000]"></div>
           <!-- ===============================
           CHIME TILE LAYOUT — INTEGRATED
@@ -228,7 +257,7 @@
             <div
                 id="video-containers"
                 class="relative overflow-hidden w-full h-full
-                        grid grid-cols-12 grid-rows-2 gap-3"
+                        grid grid-cols-12 grid-rows-2 gap-3 lg:rounded-1"
                 data-layout="host_attendee">
       
               <div id="host-container" data-name="host" data-container-type="host" data-attendee-id="" data-role="host" class="tile flex items-center justify-center rounded-xl text-white video-card">
@@ -255,47 +284,39 @@
           <!-- =============================== -->
         </div>
         <div data-template-container class="w-full h-full absolute ">
+         
+         
+         
           <!-- 📞 CALLER STATES -->
           <div v-if="state==='caller:startCall'">
             [Caller] Choose an option to start your call — audio or video.
           </div>
 
-          <div v-if="state === 'caller:callWaiting'" 
+          <div v-if="state === 'caller:callWaiting' || state === 'caller:callAccepted'" 
               class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <span class="absolute top-0 left-0">[Caller] Calling… waiting for the other person to answer. Displays user info, call type, and loading
-              indicator.</span>
+            <span class="absolute top-0 left-0">[Caller] Calling… hre we wait for other person to accept and also show accepted.</span>
               <calling-card
-                :show="state === 'caller:callWaiting'"
-                handle-text="Calling @jennyben"
-                avatar-src="https://i.ibb.co.com/35W4r1KX/Vector-user.webp"
+                :show="state === 'caller:callWaiting' || state === 'caller:callAccepted'"
+                :call-waiting-text="state === 'caller:callWaiting' ? (ChimeCallSettings.callUserDetails.callee && ChimeCallSettings.callUserDetails.callee.username ? `Calling @${ChimeCallSettings.callUserDetails.callee.username}` : '') : ''"
+                :call-accepted-text="state === 'caller:callAccepted' ? (ChimeCallSettings.callUserDetails.callee && ChimeCallSettings.callUserDetails.callee.username ? `@${ChimeCallSettings.callUserDetails.callee.username} Accepted!` : '') : ''"
+                :avatar-src="(ChimeCallSettings.callUserDetails.callee && ChimeCallSettings.callUserDetails.callee.avatar) ? ChimeCallSettings.callUserDetails.callee.avatar : ''"
+                :user-initials="(ChimeCallSettings.callUserDetails.callee && ChimeCallSettings.callUserDetails.callee.initials) ? ChimeCallSettings.callUserDetails.callee.initials : ''"
                 @end-call="onEndCall"
-                @toggle-video="onToggleVideo"
-                @toggle-mic="onToggleMic"
+                @toggle="toggleCamera"
+                @toggle-mic="toggleMicrophone"
               ></calling-card>
             
           </div>
 
-          <div v-if="state==='caller:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <span class="absolute top-0 left-0">[Caller] The callee has accepted your call! Preparing your audio or video connection.</span>
-            <call-accepted-card
-              :show="state === 'caller:callAccepted'"
-              handle-text="@jennyben Accepted!"
-              @end-call="onEndCall"
-              @toggle-video="onToggleVideo"
-              @toggle-mic="onToggleMic"
-            ></call-accepted-card>
-
-          </div>
-
-          <div v-if="state === 'caller:waitingForCamMicPermissions'"
+          <div v-if="state === 'caller:waitingForCamMicPermissions' || state === 'callee:waitingForCamMicPermissions'"
               class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <span class="absolute top-0 left-0">[Caller] Waiting for camera or microphone permissions… please allow access to continue.</span>
+            <span class="absolute top-0 left-0">{{ state === 'callee:waitingForCamMicPermissions' ? '[Callee]' : '[Caller]' }} Waiting for camera or microphone permissions… please allow access to continue.</span>
             <call-permission-card
-              :show="state === 'caller:waitingForCamMicPermissions'"
+              :show="state === 'caller:waitingForCamMicPermissions' || state === 'callee:waitingForCamMicPermissions'"
               @cancel="onCancelPermission"
               @settings="onOpenSettings"
-              @toggle-video="onToggleVideo"
-              @toggle-mic="onToggleMic"
+              @toggle="toggleCamera"
+              @toggle-mic="toggleMicrophone"
               @end-call="onEndCall"
             ></call-permission-card>
 
@@ -305,7 +326,7 @@
             <waiting-to-join></waiting-to-join>
             [Caller] Connected and joined - waiting for Callee to join!
               <bottom-controls user-initials="UN" :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
-                :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings"></bottom-controls>
+                :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings" @end-call="onEndCall"></bottom-controls>
           </div>
 
           <div v-if="state==='caller:rejected'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
@@ -323,33 +344,48 @@
           <div v-if="state==='caller:terminated'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
             <!-- [Caller] 🔌 The call has ended. -->
              <span>Terminated</span>
-             <call-rejected></call-rejected>
+             <call-ended 
+             :substate="substate" 
+             :state="state"
+             ></call-ended>
           </div>
 
 
           <!-- 🎥 CALLEE STATES -->
-          <div v-if="state==='callee:incomingAudioCall'">
-            [Callee] 📞 Incoming audio call — displaying caller’s name, avatar, and call controls.
-          </div>
-
-          <div v-if="state === 'callee:incomingVideoCall'" 
+          <div v-if="state==='callee:incomingAudioCall' || (state === 'callee:callAccepted' && ChimeCallSettings.callSettings.mediaType === 'audio')" 
               class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <span class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller’s details with options to accept or decline.</span>
+            <span v-if="state === 'callee:incomingAudioCall'" class="absolute top-0 left-0">[Callee] 📞 Incoming audio call — displaying caller's name, avatar, and call controls.</span>
             <incoming-call
-              :show="state === 'callee:incomingVideoCall'"
-              caller-name="SirStrawberry"
-              caller-handle="@sammisjelly187"
+              :show="state === 'callee:incomingAudioCall' || (state === 'callee:callAccepted' && ChimeCallSettings.callSettings.mediaType === 'audio')"
+              :caller-name="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.displayName) ? ChimeCallSettings.callUserDetails.caller.displayName : ''"
+              :caller-handle="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.username) ? `@${ChimeCallSettings.callUserDetails.caller.username}` : ''"
+              :avatar-src="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.avatar) ? ChimeCallSettings.callUserDetails.caller.avatar : ''"
+              :user-initials="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.initials) ? ChimeCallSettings.callUserDetails.caller.initials : ''"
+              :heading="state === 'callee:callAccepted' ? 'Call Accepted!' : 'Incoming Audio Call'"
+              :call-state="state === 'callee:callAccepted' ? 'callAccepted' : 'incomingAudioCall'"
               @accept="onAcceptCall"
               @decline="onDeclineCall"
               @options="onShowOptions"
+              @end-call="onEndCall"
             />
           </div>
 
-          <div v-if="state==='callee:callAccepted'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
-            <creator-call-acepted
-              :show="state === 'callee:callAccepted'"
-              handle-text="@jennyben Accepted!"
-            ></creator-call-acepted>
+          <div v-if="state === 'callee:incomingVideoCall' || state === 'callee:callAccepted'" 
+              class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex items-center justify-center">
+            <span v-if="state === 'callee:incomingVideoCall'" class="absolute top-0 left-0">Callee] 🎥 Incoming video call — showing caller's details with options to accept or decline.</span>
+            <incoming-call
+              :show="state === 'callee:incomingVideoCall' || state === 'callee:callAccepted'"
+              :caller-name="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.displayName) ? ChimeCallSettings.callUserDetails.caller.displayName : ''"
+              :caller-handle="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.username) ? `@${ChimeCallSettings.callUserDetails.caller.username}` : ''"
+              :avatar-src="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.avatar) ? ChimeCallSettings.callUserDetails.caller.avatar : ''"
+              :user-initials="(ChimeCallSettings.callUserDetails.caller && ChimeCallSettings.callUserDetails.caller.initials) ? ChimeCallSettings.callUserDetails.caller.initials : ''"
+              :heading="state === 'callee:callAccepted' ? 'Call Accepted!' : 'Incoming Video Call'"
+              :call-state="state === 'callee:callAccepted' ? 'callAccepted' : 'incomingVideoCall'"
+              @accept="onAcceptCall"
+              @decline="onDeclineCall"
+              @options="onShowOptions"
+              @end-call="onEndCall"
+            />
           </div>
 
           <!-- <div v-if="state==='callee:waitingForCamMicPermissions'">
@@ -358,9 +394,12 @@
 
 
           <div v-if="state==='callee:connected'">
-            <template-chime-callee-connected :substate="substate" :toggle-camera="toggleCamera"
-              :toggle-microphone="toggleMicrophone"
-              :chime-call-settings="ChimeCallSettings"></template-chime-callee-connected>
+            <template-chime-callee-connected 
+            :substate="substate" 
+            :toggle-camera="toggleCamera"
+            :toggle-microphone="toggleMicrophone"
+            :chime-call-settings="ChimeCallSettings"
+            @end-call="onEndCall"></template-chime-callee-connected>
             [Callee] 🔗 Connecting to the call…
 
             zzzzz
@@ -376,11 +415,13 @@
 
           <div v-if="state==='callee:declined'">
             [Callee] 🚫 The caller declined your invitation.
-          </div>
-
-          <div v-if="state==='callee:terminated'">
-            [Callee] 🔌 The call has ended.
           </div> -->
+
+          <div v-if="state==='callee:terminated'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
+            <!-- [Callee] 🔌 The call has ended. -->
+            <span>Terminated</span>
+            <call-ended :substate="substate" :state="state"></call-ended>
+          </div>
 
 
           <!-- 🤝 SHARED STATES (Both) -->
@@ -415,7 +456,6 @@
                       <div class="flex lg:hidden h-8 w-8 justify-center items-center">
                         <img class="h-[22px] w-[22px]" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/dots-horizontal.svg"/>
                       </div>
-                      <div v-show="ChimeCallSettings.callMicStatus" class=""><img class="h-16 w-16" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/mute-microphone.svg"/></div>
                     </div>
 
                     
@@ -441,14 +481,13 @@
                     <div class="flex h-full absolute left-0 right-0">
                       <!-- Bottom Controls -->
                       <bottom-controls user-initials="UN" :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
-                        :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings"></bottom-controls>
+                        :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings" @end-call="onEndCall"></bottom-controls>
 
                         <transition name="slide">
                           <div v-show="ChimeCallSettings.callChatStatus" 
-                              class="absolute right-0 md:h-full
-                               shadow-xl overflow-y-auto
-                               w-full md:w-[400px] z-50">
-                            <chat-sidebar :toggle-chat="toggleChat" :is-creator="ChimeCallSettings.userType ==='Fan'"></chat-sidebar>
+                              class="absolute right-0 h-full shadow-xl
+                               w-full lg:w-[405px] z-50 lg:pt-2 lg:pb-2 lg:pr-2">
+                            <chat-sidebar :toggle-chat="toggleChat"></chat-sidebar>
                           </div>
                         </transition>
                     </div>
@@ -498,40 +537,7 @@
 
    
       <!-- CamMic Permissions Container (Always Visible for Testing) -->
-      <div class="cam-mic-container" style="margin-top: 20px; padding: 15px; border: 2px solid #0d6efd; border-radius: 8px; background: #f8f9fa;">
-        <h3 style="margin-bottom: 15px;">Camera & Microphone Controls</h3>
-        
-        <!-- Status Indicators -->
-        <div data-cam-mic-element="status" style="margin-bottom: 15px;">
-          <div data-cam-mic-element="status-item" data-kind="camera" style="display: inline-block; margin-right: 20px;">
-            <strong>Camera:</strong> <span data-cam-mic-element="status-camera">Unknown</span>
-          </div>
-          <div data-cam-mic-element="status-item" data-kind="microphone" style="display: inline-block;">
-            <strong>Microphone:</strong> <span data-cam-mic-element="status-microphone">Unknown</span>
-          </div>
-        </div>
-        
-        <!-- Device Selectors -->
-        <div data-cam-mic-element="device-select" style="margin-bottom: 15px;">
-          <label style="margin-right: 10px;">Camera:</label>
-          <select data-cam-mic-element="video-select" style="min-width: 180px; margin-right: 20px;"></select>
-          <label style="margin-right: 10px;">Mic:</label>
-          <select data-cam-mic-element="audio-select" style="min-width: 180px;"></select>
-        </div>
-        
-        <!-- Video Preview -->
-        <div class="video-preview-container" style="max-width: 320px; max-height: 240px; border: 2px solid #0d6efd; border-radius: 8px; overflow: hidden; background: #000;">
-          <!--<video data-cam-mic-element="video-preview" autoplay playsinline style="width: 100%; height: 100%; object-fit: cover;"></video>-->
-        </div>
-        
-        <!-- Hidden elements for CamMic utility -->
-        <div data-cam-mic-element="loader" hidden>ðŸ”„ Checking Permissions...</div>
-        <div data-cam-mic-element="waiting" hidden>â³ Waiting...</div>
-        <div data-cam-mic-element="permission-icons" hidden>
-          <div data-cam-mic-element="need-camera" hidden>ðŸ“· Please allow camera access</div>
-          <div data-cam-mic-element="need-microphone" hidden>ðŸŽ¤ Please allow microphone access</div>
-        </div>
-      </div>
+
 
  
 
@@ -548,31 +554,36 @@
 
 
  <script>
+    // Initialize window.mockCallData early to prevent TypeError
+    if (typeof window !== 'undefined' && !window.mockCallData) {
+      window.mockCallData = { targetUser: null, currentUser: null };
+    }
+    
     // Mock Call Data - Single Source of Truth
+    // Default test data for development - will be overwritten with real data when call starts
     window.mockCallData = {
       currentUser: {
         userId: "444",
         username: "test_user_444",
         displayName: "Test User 444",
-        avatar: "https://picsum.photos/seed/user444/100/100",
+        avatar: "./guy.png",
         initials: "TU",
-        isCreator: false,  // true if creator, false if fan
-        isFan: true        // true if fan, false if creator
+        isCreator: false,
+        isFan: true
       },
       targetUser: {
         userId: "666", 
-        username: "test_user_666",
-        displayName: "Test User 666",
-        avatar: "https://picsum.photos/seed/user666/100/100",
-        initials: "TU",
-        isCreator: true,   // true if creator, false if fan
-        isFan: false       // true if fan, false if creator
+        username: "jennyben",
+        displayName: "Jenny Ben",
+        avatar: "./girl.png",
+        initials: "JB",
+        isCreator: true,
+        isFan: false
       },
-      // Will be populated dynamically
-      callType: null, // "INSTANT_ONE_ON_ONE" or "GROUP_ONE_ON_ONE"
-      mediaType: null, // "audio" or "video"
-      currentUserRole: null, // "host", "attendee", "collaborator"
-      currentUserSide: null, // "caller" or "callee"
+      callType: null,     // "INSTANT_ONE_ON_ONE" or "GROUP_ONE_ON_ONE" - null means no active call
+      mediaType: null,    // "audio" or "video" - null means no active call
+      currentUserRole: null, // "host", "attendee", "collaborator" - null means no active call
+      currentUserSide: null, // "caller" or "callee" - null means no active call
       isInGrace: false
     };
     
@@ -596,6 +607,41 @@
     console.log('[mockCallData] Initialized:', window.mockCallData);
     console.log('[mockCallData] Current user is creator:', window.mockCallData.isCurrentUserCreator());
     console.log('[mockCallData] Target user is creator:', window.mockCallData.isTargetUserCreator());
+    
+    // Update mockCallData userIds as user types in input fields
+    (function initMockDataUserIdSync() {
+      function updateMockDataUserIds() {
+        const currentUserIdInput = document.getElementById('currentUserId');
+        const targetUserIdInput = document.getElementById('targetUserId');
+        
+        if (currentUserIdInput && window.mockCallData && window.mockCallData.currentUser) {
+          currentUserIdInput.addEventListener('input', function(e) {
+            const userId = e.target.value.trim();
+            if (window.mockCallData && window.mockCallData.currentUser) {
+              window.mockCallData.currentUser.userId = userId;
+              console.log('[mockCallData] Updated currentUser.userId to:', userId);
+            }
+          });
+        }
+        
+        if (targetUserIdInput && window.mockCallData && window.mockCallData.targetUser) {
+          targetUserIdInput.addEventListener('input', function(e) {
+            const userId = e.target.value.trim();
+            if (window.mockCallData && window.mockCallData.targetUser) {
+              window.mockCallData.targetUser.userId = userId;
+              console.log('[mockCallData] Updated targetUser.userId to:', userId);
+            }
+          });
+        }
+      }
+      
+      // Initialize on DOM ready
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', updateMockDataUserIds);
+      } else {
+        updateMockDataUserIds();
+      }
+    })();
   </script>
 
 
@@ -612,34 +658,32 @@
             <strong>Initiate Call</strong>
           </td>
           <td style="padding: 5px; border: 1px solid black">
-            <button id="btnStartInstantCall" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
-                    text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
-                    margin: 0 5px;
-                  ">
-              Start Instant Call
-            </button>
             <button id="btnStartAudioCall" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #0d6efd;
+                    color: #fff;
                     margin: 0 5px;
-                  ">
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">
               🎤 Start Audio Instant Call
             </button>
             <button id="btnStartVideoCall" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #0d6efd;
+                    color: #fff;
                     margin: 0 5px;
-                  ">
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">
               📹 Start Video Instant Call
             </button>
           </td>
@@ -650,40 +694,58 @@
           </td>
           <td style="padding: 5px; border: 1px solid black">
             <button id="btnAccept" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #0d6efd;
+                    color: #fff;
                     margin: 0 5px;
-                  ">
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">
               Accept
             </button>
-            <select id="rejectReason">
+            <select id="rejectReason" style="
+                    border: 1px solid #6c757d;
+                    padding: 6px 12px;
+                    border-radius: 6px;
+                    margin: 0 5px;
+                    cursor: pointer;
+                  ">
               <option value="busy">Busy</option>
               <option value="not_available">Not available</option>
               <option value="in_another_call">In another call</option>
               <option value="spam">Spam</option>
             </select>
             <button id="btnReject" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #dc3545;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #dc3545;
+                    color: #fff;
                     margin: 0 5px;
-                  ">
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#bb2d3b'" onmouseout="this.style.background='#dc3545'">
               Reject
             </button>
-            <button id="btnCancelCall" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+            <button id="btn-terminate-call" style="
+                    border: 1px solid #dc3545;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #dc3545;
+                    color: #fff;
                     margin: 0 5px;
-                  ">
-              Cancel
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#bb2d3b'" onmouseout="this.style.background='#dc3545'">
+              Terminate Call
             </button>
           </td>
         </tr>
@@ -693,37 +755,57 @@
           </td>
           <td style="padding: 5px; border: 1px solid black">
             <a id="link-video-on" href="#" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #0d6efd;
+                    color: #fff;
                     margin: 0 5px;
-                  ">Video On</a>
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    display: inline-block;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">Video On</a>
             <a id="link-video-off" href="#" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #6c757d;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #6c757d;
+                    color: #fff;
                     margin: 0 5px;
-                  ">Video Off</a>
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    display: inline-block;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#5c636a'" onmouseout="this.style.background='#6c757d'">Video Off</a>
             <a id="link-audio-on" href="#" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #0d6efd;
+                    color: #fff;
                     margin: 0 5px;
-                  ">Audio On</a>
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    display: inline-block;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">Audio On</a>
             <a id="link-audio-off" href="#" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
+                    border: 1px solid #6c757d;
+                    padding: 6px 12px;
                     text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
+                    background: #6c757d;
+                    color: #fff;
                     margin: 0 5px;
-                  ">Audio Off</a>
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    display: inline-block;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#5c636a'" onmouseout="this.style.background='#6c757d'">Audio Off</a>
           </td>
         </tr>
         <tr>
@@ -853,7 +935,28 @@
         </tr>
         <tr>
           <td style="padding: 5px; border: 1px solid black">
-            <strong>ðŸ“‹ Mock User Data</strong>
+            <strong>Socket</strong>
+          </td>
+          <td style="padding: 5px; border: 1px solid black">
+            <button id="btnLoginRegister" style="
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
+                    text-decoration: none;
+                    background: #0d6efd;
+                    color: #fff;
+                    margin: 0 5px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">
+              Register Logged In (Connect Socket)
+            </button>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 5px; border: 1px solid black">
+            <strong>ðŸ"‹ Mock User Data</strong>
           </td>
           <td style="padding: 5px; border: 1px solid black; font-family: monospace; font-size: 11px;">
             <div id="mock-data-display" style="white-space: pre-wrap;"></div>
@@ -865,9 +968,42 @@
           </td>
           <td style="padding: 5px; border: 1px solid black">
             <strong>Status:</strong> <span id="grace-status">FALSE</span><br><br>
-            <button id="btn-grace-start">Start Grace Period</button>
-            <button id="btn-grace-resume">Resume from Grace</button>
-            <button id="btn-grace-end-fail">End Grace (Fail)</button>
+            <button id="btn-grace-start" style="
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
+                    text-decoration: none;
+                    background: #0d6efd;
+                    color: #fff;
+                    margin: 0 5px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">Start Grace Period</button>
+            <button id="btn-grace-resume" style="
+                    border: 1px solid #0d6efd;
+                    padding: 6px 12px;
+                    text-decoration: none;
+                    background: #0d6efd;
+                    color: #fff;
+                    margin: 0 5px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#0b5ed7'" onmouseout="this.style.background='#0d6efd'">Resume from Grace</button>
+            <button id="btn-grace-end-fail" style="
+                    border: 1px solid #dc3545;
+                    padding: 6px 12px;
+                    text-decoration: none;
+                    background: #dc3545;
+                    color: #fff;
+                    margin: 0 5px;
+                    border-radius: 6px;
+                    cursor: pointer;
+                    font-weight: 500;
+                    transition: background-color 0.2s;
+                  " onmouseover="this.style.background='#bb2d3b'" onmouseout="this.style.background='#dc3545'">End Grace (Fail)</button>
           </td>
         </tr>
         <tr>
@@ -892,7 +1028,7 @@
         </tr>
         <tr>
           <td style="padding: 5px; border: 1px solid black">
-            <strong>ðŸ”‘ Token Updates (Rehan)</strong>
+            <strong>ðŸ"‘ Token Updates (Rehan)</strong>
           </td>
           <td style="padding: 5px; border: 1px solid black">
             <!-- Rehan will add token update buttons here -->
@@ -900,19 +1036,25 @@
         </tr>
         <tr>
           <td style="padding: 5px; border: 1px solid black">
-            <strong>Socket</strong>
+            <strong>callSettings</strong>
           </td>
           <td style="padding: 5px; border: 1px solid black">
-            <button id="btnLoginRegister" style="
-                    border: 1px solid #ccc;
-                    padding: 2px 6px;
-                    text-decoration: none;
-                    background: #f0f0f0;
-                    color: #333;
-                    margin: 0 5px;
-                  ">
-              Register Logged In (Connect Socket)
-            </button>
+            <div style="font-size: 12px;">
+              <strong>State:</strong> <span id="debug-call-state">-</span> (<span id="debug-call-role">-</span>)<br>
+              <strong>callCamStatus:</strong> <span id="debug-call-cam-status">-</span><br>
+              <strong>callMicStatus:</strong> <span id="debug-call-mic-status">-</span>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding: 5px; border: 1px solid black">
+            <strong>Cam/Mic Global Settings</strong>
+          </td>
+          <td style="padding: 5px; border: 1px solid black">
+            <div style="font-size: 12px;">
+              <strong>Camera:</strong> <span id="debug-global-cam-status">OFF</span><br>
+              <strong>Microphone:</strong> <span id="debug-global-mic-status">OFF</span>
+            </div>
           </td>
         </tr>
         <tr>
@@ -931,37 +1073,38 @@
           </td>
           <td style="padding: 5px; border: 1px solid black">
             <div style="margin-top: 8px">
-              current â†’ state:
-              <b>{{ state || '(none)' }}</b> /
-              substate: <b>{{ substate || '(none)' }}</b>
+              current â†' state:
+              <b id="debug-ui-state">(none)</b> /
+              substate: <b id="debug-ui-substate">(none)</b>
             </div>
 
-            <!-- ðŸ”¹ History log -->
-            <div id="ui-history"
-              style="margin-top: 10px; max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 13px;">
-            </div>
-            <div style="margin-top: 8px">
-              current â†’ state:
-              <b>{{ state || '(none)' }}</b> /
-              substate: <b>{{ substate || '(none)' }}</b>
-            </div>
-
-            <!-- ðŸ”¹ History log -->
+            <!-- ðŸ"¹ History log -->
             <div id="ui-history"
               style="margin-top: 10px; max-height: 180px; overflow-y: auto; font-family: monospace; font-size: 13px;">
             </div>
 
             <script>
+              // Update state/substate display elements
+              function updateUIStateDisplay(state, substate) {
+                const stateEl = document.getElementById('debug-ui-state');
+                const substateEl = document.getElementById('debug-ui-substate');
+                if (stateEl) stateEl.textContent = state || '(none)';
+                if (substateEl) substateEl.textContent = substate || '(none)';
+              }
+
               document.addEventListener("chime-ui::state", (e) => {
                 const d = e.detail;
                 const ts = new Date(d.ts).toLocaleTimeString();
-                console.log("[UI EVENT] chime-ui::state received â†’", d);
+                console.log("[UI EVENT] chime-ui::state received â†'", d);
+
+                // Update state/substate display (outside Vue)
+                updateUIStateDisplay(d.state, d.substate);
 
                 // update live state display if using Vue/reactivity
                 if (window.vueApp && window.vueApp.state !== undefined) {
                   // Only update Vue state if it's actually changing (prevent UI flicker)
                   if (window.vueApp.state !== d.state) {
-                    console.log('[UI EVENT] State changed:', window.vueApp.state, 'â†’', d.state);
+                    console.log('[UI EVENT] State changed:', window.vueApp.state, '->', d.state);
                     window.vueApp.state = d.state;
                   } else {
                     console.log('[UI EVENT] State unchanged (no UI shift):', d.state);
@@ -969,6 +1112,31 @@
                   
                   // Always update substate (for tracking)
                   window.vueApp.substate = d.substate;
+                }
+                
+                // Update global settings with current state and role
+                if (window.settings) {
+                  window.settings.currentState = d.state || '';
+                  window.settings.currentSubstate = d.substate || '';
+                  // Extract role from state (e.g., 'caller:callWaiting' -> 'caller')
+                  const role = d.state ? d.state.split(':')[0] : '';
+                  window.settings.currentRole = (role === 'caller' || role === 'callee') ? role : '';
+                  
+                  // Update callType and mediaType from event detail if provided
+                  if (d.callType) {
+                    window.settings.callSettings.callType = d.callType;
+                  }
+                  if (d.mediaType) {
+                    window.settings.callSettings.mediaType = d.mediaType;
+                  }
+                  
+                  console.log('[UI EVENT] Global settings updated:', {
+                    currentState: window.settings.currentState,
+                    currentRole: window.settings.currentRole,
+                    currentSubstate: window.settings.currentSubstate,
+                    callType: window.settings.callSettings.callType,
+                    mediaType: window.settings.callSettings.mediaType
+                  });
                 }
 
                 // append history line
@@ -981,6 +1149,44 @@
                   history.scrollTop = history.scrollHeight;
                 }
               });
+
+              // Listen for debug control events for cam/mic global settings
+              document.addEventListener("debugControls:camOn", () => {
+                const el = document.getElementById('debug-global-cam-status');
+                if (el) el.textContent = 'ON';
+              });
+
+              document.addEventListener("debugControls:camOff", () => {
+                const el = document.getElementById('debug-global-cam-status');
+                if (el) el.textContent = 'OFF';
+              });
+
+              document.addEventListener("debugControls:micOn", () => {
+                const el = document.getElementById('debug-global-mic-status');
+                if (el) el.textContent = 'ON';
+              });
+
+              document.addEventListener("debugControls:micOff", () => {
+                const el = document.getElementById('debug-global-mic-status');
+                if (el) el.textContent = 'OFF';
+              });
+
+              // Initialize display on load
+              setTimeout(() => {
+                if (window.settings) {
+                  if (window.settings.callCamStatus) {
+                    document.dispatchEvent(new CustomEvent('debugControls:camOn'));
+                  } else {
+                    document.dispatchEvent(new CustomEvent('debugControls:camOff'));
+                  }
+                  
+                  if (window.settings.callMicStatus) {
+                    document.dispatchEvent(new CustomEvent('debugControls:micOn'));
+                  } else {
+                    document.dispatchEvent(new CustomEvent('debugControls:micOff'));
+                  }
+                }
+              }, 500);
             </script>
           </td>
         </tr>
@@ -1292,7 +1498,6 @@
 
 
 
-
   <script>
     // ============================================================
     // GLOBAL STATE DISPATCH THROTTLE
@@ -1375,6 +1580,11 @@
         }
 
         try {
+          // Initialize CamMic handler before creating Vue app
+          console.log('[index.html] Initializing CamMicPermissionsHandler...');
+          window.dispatchEvent(new CustomEvent('CamMic:Init'));
+          console.log('[index.html] ✅ CamMic:Init event dispatched');
+
           const app = Vue.createApp({
             components: comps,
             setup() {
@@ -1390,25 +1600,154 @@
                 callChatStatus: false, // Chat sidebar visibility state
                 userAvatarUrl: '',
                 userType:'',
+                currentState: '', // Full state (e.g., 'caller:callWaiting', 'callee:incomingVideoCall')
+                currentRole: '', // Extracted role ('caller' or 'callee')
+                currentSubstate: '', // Substate if any
+                // Call user details (caller and callee information) - reactive
+                callUserDetails: Vue.reactive({
+                  caller: null, // Caller user object
+                  callee: null  // Callee user object
+                }),
+                // Call settings - reactive
+                callSettings: Vue.reactive({
+                  callType: null, // "INSTANT_ONE_ON_ONE" or "GROUP_ONE_ON_ONE"
+                  mediaType: null, // "audio" or "video"
+                  currentUserRole: null, // "host", "attendee", "collaborator"
+                  currentUserSide: null, // "caller" or "callee"
+                  isInGrace: false
+                }),
+                // Chat settings - reactive
+                chatSettings: Vue.reactive({
+                  enabled: false,
+                  sidebarVisible: false,
+                  unreadCount: 0,
+                  lastMessageTime: null
+                })
               });
 
-              window.settings = ChimeCallSettings; 
+              window.settings = ChimeCallSettings;
+              
+              // Sync callUserDetails from callData (one-time, immutable after set)
+              // Current user avatar is always static guy.png
+              const staticCurrentUserAvatar = './guy.png';
+              
+              if (window.callData || window.mockCallData) {
+                const data = window.callData || window.mockCallData;
+                // Determine caller and callee based on currentUserSide
+                if (data.currentUserSide === 'caller') {
+                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
+                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
+                } else if (data.currentUserSide === 'callee') {
+                  ChimeCallSettings.callUserDetails.caller = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
+                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
+                  ChimeCallSettings.callUserDetails.callee = currentUserData ? Vue.reactive(currentUserData) : null;
+                } else {
+                  // Fallback: if side not set, assume currentUser is caller
+                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
+                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
+                }
+                
+                // Sync callSettings (one-time, immutable after set)
+                ChimeCallSettings.callSettings.callType = data.callType || null;
+                ChimeCallSettings.callSettings.mediaType = data.mediaType || null;
+                ChimeCallSettings.callSettings.currentUserRole = data.currentUserRole || null;
+                ChimeCallSettings.callSettings.currentUserSide = data.currentUserSide || null;
+                ChimeCallSettings.callSettings.isInGrace = data.isInGrace || false;
+              } 
 
               // âœ… Vue click handlers
-              // function to toggle camera
+              // function to toggle camera - EXACT FLOW FROM DEMO
               function toggleCamera() {
                 const newState = !ChimeCallSettings.callCamStatus;
                 ChimeCallSettings.callCamStatus = newState;
+                
+                // Dispatch debug control event for camera status
+                document.dispatchEvent(new CustomEvent(newState ? 'debugControls:camOn' : 'debugControls:camOff'));
+                
+                console.log(`[Vue] Camera toggled â†' ${newState ? 'ON' : 'OFF'}, current state: ${state.value}`);
+                
+                // If turning ON and in caller:callWaiting or caller:callAccepted, use CamMic with proper state management
+                if (newState && (state.value === 'caller:callWaiting' || state.value === 'caller:callAccepted')) {
+                  console.log(`[Vue] [CamMic] Starting CamMic orchestration flow...`);
+                  
+                  const mediaType = window.mockCallData?.mediaType || 'video';
+                  const isVideoCall = mediaType === 'video';
+                  const returnState = state.value;
+                  
+                  // Listen for UI events from CamMic handler
+                  const onShowWaiting = (ev) => {
+                    // Check guard flag before transitioning
+                    if (window.CallHandler && window.CallHandler._isInCamMicWaiting) {
+                      console.log('[Vue] [CamMic] CamMic:UI:ShowWaiting - guard flag already set, skipping transition');
+                      return;
+                    }
+                    console.log('[Vue] [CamMic] CamMic:UI:ShowWaiting - transitioning to caller:waitingForCamMicPermissions');
+                    document.dispatchEvent(new CustomEvent('chime-ui::state', {
+                      detail: {
+                        state: 'caller:waitingForCamMicPermissions',
+                        substate: 'none',
+                        ts: Date.now(),
+                      }
+                    }));
+                  };
+                  
+                  const onPermissionsResolved = (ev) => {
+                    // Use nextState from event detail if provided, otherwise use stored returnState
+                    const detail = ev.detail || {};
+                    const resolvedNextState = detail.nextState || returnState;
+                    console.log('[Vue] [CamMic] CamMic:UI:PermissionsResolved - returning to', resolvedNextState);
+                    document.dispatchEvent(new CustomEvent('chime-ui::state', {
+                      detail: {
+                        state: resolvedNextState,
+                        substate: 'none',
+                        ts: Date.now(),
+                      }
+                    }));
+                  };
+                  
+                  // Register listeners BEFORE dispatching
+                  window.addEventListener('CamMic:UI:ShowWaiting', onShowWaiting);
+                  window.addEventListener('CamMic:UI:PermissionsResolved', onPermissionsResolved);
+                  
+                  // Cleanup on completion
+                  const onOrchestrationComplete = (ev) => {
+                    window.removeEventListener('CamMic:UI:ShowWaiting', onShowWaiting);
+                    window.removeEventListener('CamMic:UI:PermissionsResolved', onPermissionsResolved);
+                    window.removeEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+                  };
+                  window.addEventListener('CamMic:Orchestrate:Complete', onOrchestrationComplete);
+                  
+                  // Dispatch orchestration with returnState in detail
+                  if (isVideoCall) {
+                    console.log('[Vue] [CamMic] Dispatching CamMic:Orchestrate:Both with returnState:', returnState);
+                    window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both', {
+                      detail: { returnState }
+                    }));
+                  } else {
+                    console.log('[Vue] [CamMic] Dispatching CamMic:Orchestrate:Microphone with returnState:', returnState);
+                    window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone', {
+                      detail: { returnState }
+                    }));
+                  }
+                  
+                  return;
+                }
+                
                 if (typeof chimeHandler !== 'undefined' && chimeHandler.handleVideoToggle) {
                   chimeHandler.handleVideoToggle(newState);
                 }
-                console.log(`[Vue] Camera toggled â†’ ${newState ? 'ON' : 'OFF'}`);
               }
 
               // function to toggle microphone
               function toggleMicrophone() {
                 const newState = !ChimeCallSettings.callMicStatus;
                 ChimeCallSettings.callMicStatus = newState;
+                
+                // Dispatch debug control event for microphone status
+                document.dispatchEvent(new CustomEvent(newState ? 'debugControls:micOn' : 'debugControls:micOff'));
+                
                 if (typeof chimeHandler !== 'undefined' && chimeHandler.handleAudioToggle) {
                   chimeHandler.handleAudioToggle(newState);
                 }
@@ -1576,6 +1915,197 @@
                 document.removeEventListener('chime-ui::state', handleUiStateEvent);
               });
 
+              // End call handler - terminates call when user clicks end-call button
+              const onEndCall = () => {
+                console.log('%c[Vue] onEndCall called', 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+                console.log('[Vue] Current state:', state.value);
+                console.log('[Vue] Current substate:', substate.value);
+
+                const invite = window.CallHandler?._invite;
+                console.log('[Vue] CallHandler._invite:', invite);
+
+                const currentUserId = document.getElementById('currentUserId')?.value.trim();
+                const targetUserId = document.getElementById('targetUserId')?.value.trim();
+                console.log('[Vue] User IDs:', { currentUserId, targetUserId });
+
+                // Determine role based on current state
+                let role = null;
+                if (state.value?.startsWith('caller:')) {
+                  role = 'caller';
+                } else if (state.value?.startsWith('callee:')) {
+                  role = 'callee';
+                }
+                console.log('[Vue] Role determined:', role);
+
+                // Dispatch app:call:terminate event
+                const eventDetail = {
+                  callerId: invite?.callerId || targetUserId || currentUserId,
+                  calleeId: invite?.calleeId || currentUserId || targetUserId,
+                  role: role,
+                  timestamp: Date.now()
+                };
+
+                console.log('%c[Vue] Dispatching app:call:terminate event', 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', eventDetail);
+
+                const event = new CustomEvent('app:call:terminate', {
+                  detail: eventDetail
+                });
+                document.dispatchEvent(event);
+                console.log('[Vue] Event dispatched');
+              };
+
+              // Accept call handler - dispatches app:call:accept event
+              function onAcceptCall() {
+                console.log('%c[Vue] onAcceptCall called', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+                console.log('[Vue] Current state:', state.value);
+                console.log('[Vue] Current substate:', substate.value);
+                
+                // Get call data from CallHandler._invite (populated when incoming call arrives)
+                const invite = window.CallHandler && window.CallHandler._invite ? window.CallHandler._invite : null;
+                console.log('[Vue] CallHandler._invite:', invite);
+                
+                const currentUserId = document.getElementById('currentUserId')?.value?.trim();
+                const targetUserId = document.getElementById('targetUserId')?.value?.trim();
+                console.log('[Vue] User IDs:', { currentUserId, targetUserId });
+                
+                // Determine callee role (opposite of caller role)
+                let calleeRole = 'attendee'; // default
+                if (invite && invite.callerRole) {
+                  // If caller is host, callee is attendee (and vice versa)
+                  calleeRole = invite.callerRole === 'host' ? 'attendee' : 'host';
+                }
+                console.log('[Vue] Callee role determined:', calleeRole);
+                
+                // callType in _invite is mediaType ('video' or 'audio'), but handleAppAcceptCall expects call type ('INSTANT_ONE_ON_ONE')
+                const eventDetail = {
+                  callerId: invite?.callerId || targetUserId,
+                  calleeId: invite?.calleeId || currentUserId,
+                  role: calleeRole,
+                  callType: 'INSTANT_ONE_ON_ONE', // Always INSTANT_ONE_ON_ONE for instant calls
+                  timestamp: Date.now()
+                };
+                
+                console.log('%c[Vue] Dispatching app:call:accept event', 'background: #007bff; color: white; font-weight: bold; padding: 5px;', eventDetail);
+                
+                const event = new CustomEvent('app:call:accept', {
+                  detail: eventDetail
+                });
+                
+                document.dispatchEvent(event);
+                console.log('%c[Vue] Event dispatched', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+              }
+
+              // Decline call handler - uses terminate flow (callee:terminated with 'declined' substate)
+              function onDeclineCall() {
+                console.log('%c[Vue] onDeclineCall called', 'background: #dc3545; color: white; font-weight: bold; padding: 5px;');
+                console.log('[Vue] Current state:', state.value);
+                console.log('[Vue] Current substate:', substate.value);
+                
+                // Get call data from CallHandler._invite (populated when incoming call arrives)
+                const invite = window.CallHandler && window.CallHandler._invite ? window.CallHandler._invite : null;
+                console.log('[Vue] CallHandler._invite:', invite);
+                
+                const currentUserId = document.getElementById('currentUserId')?.value?.trim();
+                const targetUserId = document.getElementById('targetUserId')?.value?.trim();
+                console.log('[Vue] User IDs:', { currentUserId, targetUserId });
+                
+                // Determine role based on current state
+                let role = null;
+                if (state.value?.startsWith('callee:')) {
+                  role = 'callee';
+                } else if (state.value?.startsWith('caller:')) {
+                  role = 'caller';
+                }
+                console.log('[Vue] Role determined:', role);
+                
+                // Dispatch app:call:terminate event - handleTerminateClick() will handle the declined substate correctly
+                const eventDetail = {
+                  callerId: invite?.callerId || targetUserId,
+                  calleeId: invite?.calleeId || currentUserId,
+                  role: role,
+                  timestamp: Date.now()
+                };
+                
+                console.log('%c[Vue] Dispatching app:call:terminate event (decline uses terminate flow)', 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', eventDetail);
+                
+                const event = new CustomEvent('app:call:terminate', {
+                  detail: eventDetail
+                });
+                
+                document.dispatchEvent(event);
+                console.log('%c[Vue] Event dispatched', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+              }
+
+              // Sync mockCallData to Vue call settings
+              function syncMockDataToVueSettings() {
+                if (typeof window === 'undefined' || !window.mockCallData) {
+                  console.log('[Vue] mockCallData not available for sync');
+                  return;
+                }
+                
+                const data = window.mockCallData;
+                console.log('%c[Vue] Syncing mockCallData to Vue call settings', 'background: #007bff; color: white; font-weight: bold; padding: 5px;', data);
+                
+                // Sync call settings
+                if (data.callType) ChimeCallSettings.callSettings.callType = data.callType;
+                if (data.mediaType) ChimeCallSettings.callSettings.mediaType = data.mediaType;
+                if (data.currentUserRole) ChimeCallSettings.callSettings.currentUserRole = data.currentUserRole;
+                if (data.currentUserSide) ChimeCallSettings.callSettings.currentUserSide = data.currentUserSide;
+                if (data.isInGrace !== undefined) ChimeCallSettings.callSettings.isInGrace = data.isInGrace;
+                
+                // Sync user details based on side
+                // Current user avatar is always static guy.png
+                const staticCurrentUserAvatar = './guy.png';
+                
+                if (data.currentUserSide === 'caller') {
+                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
+                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
+                } else if (data.currentUserSide === 'callee') {
+                  ChimeCallSettings.callUserDetails.caller = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
+                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
+                  ChimeCallSettings.callUserDetails.callee = currentUserData ? Vue.reactive(currentUserData) : null;
+                }
+                
+                console.log('%c[Vue] Mock data synced to Vue call settings', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+              }
+              
+              // Reset call settings - called from CallHandler cleanup
+              function resetCallSettings() {
+                console.log('%c[Vue] resetCallSettings called - clearing all call settings', 'background: #ff6b6b; color: white; font-weight: bold; padding: 5px;');
+                
+                // Reset call settings
+                ChimeCallSettings.callSettings.callType = null;
+                ChimeCallSettings.callSettings.mediaType = null;
+                ChimeCallSettings.callSettings.currentUserRole = null;
+                ChimeCallSettings.callSettings.currentUserSide = null;
+                ChimeCallSettings.callSettings.isInGrace = false;
+                
+                // Reset cam/mic status (prevent inheritance from previous call)
+                ChimeCallSettings.callCamStatus = false;
+                ChimeCallSettings.callMicStatus = false;
+                
+                // Reset chat status
+                ChimeCallSettings.callChatStatus = false;
+                
+                // Reset chat settings
+                ChimeCallSettings.chatSettings.enabled = false;
+                ChimeCallSettings.chatSettings.sidebarVisible = false;
+                ChimeCallSettings.chatSettings.unreadCount = 0;
+                ChimeCallSettings.chatSettings.lastMessageTime = null;
+                
+                // Reset call user details
+                ChimeCallSettings.callUserDetails.caller = null;
+                ChimeCallSettings.callUserDetails.callee = null;
+                
+                // Reset state tracking
+                ChimeCallSettings.currentState = '';
+                ChimeCallSettings.currentRole = '';
+                ChimeCallSettings.currentSubstate = '';
+                
+                console.log('%c[Vue] Call settings reset complete (including cam/mic, chat, user details, and state)', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
+              }
+
               return {
                 state,
                 substate,
@@ -1590,6 +2120,11 @@
                 toggleChat,
                 getMediaType,
                 getTargetUser,
+                onEndCall,
+                onAcceptCall,
+                onDeclineCall,
+                resetCallSettings,
+                syncMockDataToVueSettings,
               };
             },
           });
@@ -1615,22 +2150,32 @@
           if (typeof registerCameraButton === 'function') registerCameraButton(app);
           if (typeof registerMicrophoneButton === 'function') registerMicrophoneButton(app);
           if (typeof registerEndCallButton === 'function') registerEndCallButton(app);
+          if (typeof registerGlobalTerminateButton === 'function') registerGlobalTerminateButton(app);
 
             // Calling Flow
 
+          if (typeof registerLoadingSpinner === 'function') registerLoadingSpinner(app);
           if (typeof registerIncomingCall === 'function') registerIncomingCall(app);
           if (typeof registerCallingCard === 'function') registerCallingCard(app);
           if (typeof registerCallAcceptedCard === 'function') registerCallAcceptedCard(app);
           if (typeof registerAcceptedCreatorCard === 'function') registerAcceptedCreatorCard(app);
           if (typeof registerCallPermissionCard === 'function') registerCallPermissionCard(app);
           if (typeof registerCallRejected=== 'function') registerCallRejected(app);
+          if (typeof registerCallEnded === 'function') registerCallEnded(app);
           if (typeof registerCallMissed=== 'function') registerCallMissed(app);
           if (typeof registerWaitingToJoin=== 'function') registerWaitingToJoin(app);
+          if (typeof registerDefaultAvatar === "function") { registerDefaultAvatar(app);}
+          if (typeof registerCamMicTooltip === "function") { registerCamMicTooltip(app);}
+          
           
 
           // Mount Vue app to #app
           console.log('[Vue] Mounting to #app');
-          app.mount('#app');
+          const vueAppInstance = app.mount('#app');
+          
+          // Expose Vue app instance to window for CallHandler access
+          window.vueApp = vueAppInstance;
+          console.log('[Vue] ✅ Vue app instance exposed to window.vueApp');
         } catch (error) {
           console.error('Error creating Vue app:', error);
         }
@@ -1726,6 +2271,35 @@
       console.log("[Demo] Background changed to:", imageUrl || "None");
       if (typeof DebugLogger !== "undefined") {
         DebugLogger.system(`Background changed to: ${imageUrl || 'none'}`);
+      }
+      if (typeof coreChime !== "undefined") {
+        coreChime.setBackgroundImage(imageUrl || null).catch((err) => {
+          console.error("[Demo] Failed to set background:", err);
+        });
+      }
+    });
+
+    // Event listener for app:background:blur (from settings checkbox)
+    document.addEventListener("app:background:blur", (e) => {
+      const { enabled, level } = e.detail || {};
+      console.log("[Demo] app:background:blur event received:", { enabled, level });
+      if (typeof DebugLogger !== "undefined") {
+        DebugLogger.system(`Blur checkbox changed: ${enabled ? 'ON' : 'OFF'} (level: ${level})`);
+      }
+      if (typeof coreChime !== "undefined") {
+        const blurLevel = enabled ? level : 'off';
+        coreChime.setVideoBlur(blurLevel).catch((err) => {
+          console.error("[Demo] Failed to set blur:", err);
+        });
+      }
+    });
+
+    // Event listener for app:background:image (from virtual background selection)
+    document.addEventListener("app:background:image", (e) => {
+      const { imageUrl, type } = e.detail || {};
+      console.log("[Demo] app:background:image event received:", { imageUrl, type });
+      if (typeof DebugLogger !== "undefined") {
+        DebugLogger.system(`Virtual background changed: ${imageUrl || 'none'}`);
       }
       if (typeof coreChime !== "undefined") {
         coreChime.setBackgroundImage(imageUrl || null).catch((err) => {
@@ -2156,7 +2730,7 @@ CallHandler.dipatchUI("caller:startCall");
           }
       
           // base & helper functions (keeps existing "video-card" or "hidden")
-          const BASE_TILE    = "tile flex items-center justify-center rounded-xl border border-slate-300 bg-slate-900 text-white";
+          const BASE_TILE    = "tile flex items-center justify-center bg-slate-900 text-white";
           const MINI_OVERLAY = "absolute bottom-[10rem] right-4 w-[25rem] h-[15rem] z-50 rounded-xl overflow-hidden";
           const FULL_VIEW    = "absolute inset-0 w-auto h-auto rounded-xl";
       
@@ -2520,7 +3094,27 @@ CallHandler.dipatchUI("caller:startCall");
       }
     });
 
-    console.log('[Debug] âœ… Grace period controls initialized');
+    const terminateBtn = document.getElementById('btn-terminate-call');
+    if (terminateBtn) {
+      console.log('%c[TERMINATE BUTTON] ✅ Button found, attaching click handler', 'background: #28a745; color: white; padding: 5px;');
+      terminateBtn.addEventListener('click', () => {
+        console.log('%c[TERMINATE BUTTON] 🖱️ Button clicked!', 'background: #ff6b6b; color: white; font-weight: bold; padding: 5px;');
+        if (typeof CallHandler !== 'undefined' && CallHandler.handleTerminateClick) {
+          console.log('%c[TERMINATE BUTTON] ✅ CallHandler.handleTerminateClick exists, calling...', 'background: #28a745; color: white; padding: 5px;');
+          CallHandler.handleTerminateClick();
+        } else {
+          console.error('%c[TERMINATE BUTTON] ❌ CallHandler.handleTerminateClick not found', 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+            hasCallHandler: typeof CallHandler !== 'undefined',
+            hasMethod: typeof CallHandler?.handleTerminateClick === 'function'
+          });
+        }
+      });
+    } else {
+      console.warn('%c[TERMINATE BUTTON] ⚠️ Button not found in DOM', 'background: #ffc107; color: black; padding: 5px;');
+    }
+
+    console.log('[Debug] ✅ Grace period controls initialized');
+    console.log('[Debug] ✅ Terminate call button initialized');
   })();
 
   // Debug Call State Display Update Function
@@ -2535,30 +3129,41 @@ CallHandler.dipatchUI("caller:startCall");
       document.getElementById('debug-your-side').textContent = data.currentUserSide || '-';
       document.getElementById('debug-grace').textContent = data.isInGrace ? 'TRUE' : 'FALSE';
       
+      // Only show user data if there's an active call (callType or currentUserSide is set)
+      const hasActiveCall = data.callType || data.currentUserSide;
+      
       const currentUserEl = document.getElementById('debug-current-user');
-      if (currentUserEl && data.currentUser) {
-        currentUserEl.innerHTML = `
-          User ID: ${data.currentUser.userId}<br>
-          Username: @${data.currentUser.username}<br>
-          Display Name: ${data.currentUser.displayName}<br>
-          Avatar: ${data.currentUser.avatar || 'N/A'}<br>
-          Initials: ${data.currentUser.initials}<br>
-          <strong>Is Creator: ${data.currentUser.isCreator ? 'YES' : 'NO'}</strong><br>
-          <strong>Is Fan: ${data.currentUser.isFan ? 'YES' : 'NO'}</strong>
-        `;
+      if (currentUserEl) {
+        if (hasActiveCall && data.currentUser) {
+          currentUserEl.innerHTML = `
+            User ID: ${data.currentUser.userId}<br>
+            Username: @${data.currentUser.username}<br>
+            Display Name: ${data.currentUser.displayName}<br>
+            Avatar: ${data.currentUser.avatar || 'N/A'}<br>
+            Initials: ${data.currentUser.initials}<br>
+            <strong>Is Creator: ${data.currentUser.isCreator ? 'YES' : 'NO'}</strong><br>
+            <strong>Is Fan: ${data.currentUser.isFan ? 'YES' : 'NO'}</strong>
+          `;
+        } else {
+          currentUserEl.textContent = '-';
+        }
       }
       
       const targetUserEl = document.getElementById('debug-target-user');
-      if (targetUserEl && data.targetUser) {
-        targetUserEl.innerHTML = `
-          User ID: ${data.targetUser.userId}<br>
-          Username: @${data.targetUser.username}<br>
-          Display Name: ${data.targetUser.displayName}<br>
-          Avatar: ${data.targetUser.avatar || 'N/A'}<br>
-          Initials: ${data.targetUser.initials}<br>
-          <strong>Is Creator: ${data.targetUser.isCreator ? 'YES' : 'NO'}</strong><br>
-          <strong>Is Fan: ${data.targetUser.isFan ? 'YES' : 'NO'}</strong>
-        `;
+      if (targetUserEl) {
+        if (hasActiveCall && data.targetUser) {
+          targetUserEl.innerHTML = `
+            User ID: ${data.targetUser.userId}<br>
+            Username: @${data.targetUser.username}<br>
+            Display Name: ${data.targetUser.displayName}<br>
+            Avatar: ${data.targetUser.avatar || 'N/A'}<br>
+            Initials: ${data.targetUser.initials}<br>
+            <strong>Is Creator: ${data.targetUser.isCreator ? 'YES' : 'NO'}</strong><br>
+            <strong>Is Fan: ${data.targetUser.isFan ? 'YES' : 'NO'}</strong>
+          `;
+        } else {
+          targetUserEl.textContent = '-';
+        }
       }
     }
 
@@ -2567,7 +3172,1312 @@ CallHandler.dipatchUI("caller:startCall");
     
     console.log('[Debug] âœ… Call state display initialized');
   })();
+
+  // Debug Call Settings Display Update Function
+  (function initDebugCallSettings() {
+    function updateDebugCallSettings() {
+      if (typeof window === 'undefined' || !window.settings) return;
+      const settings = window.settings;
+      
+      const stateEl = document.getElementById('debug-call-state');
+      if (stateEl && settings.currentState) {
+        stateEl.textContent = settings.currentState || '-';
+      }
+      
+      const roleEl = document.getElementById('debug-call-role');
+      if (roleEl && settings.currentRole) {
+        roleEl.textContent = settings.currentRole || '-';
+      }
+      
+      const camStatusEl = document.getElementById('debug-call-cam-status');
+      if (camStatusEl) {
+        camStatusEl.textContent = settings.callCamStatus ? 'true' : 'false';
+      }
+      
+      const micStatusEl = document.getElementById('debug-call-mic-status');
+      if (micStatusEl) {
+        micStatusEl.textContent = settings.callMicStatus ? 'true' : 'false';
+      }
+    }
+
+    // Update on interval
+    setInterval(updateDebugCallSettings, 1000);
+    
+    // Initial update
+    updateDebugCallSettings();
+    
+    console.log('[Debug] âœ… Call settings display initialized');
+  })();
   </script>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div class="container mt-4">
+  <h1 class="mb-4">CamMic Permissions Test</h1>
+  
+  <!-- Important Notice -->
+  <div class="alert alert-info mb-4" role="alert">
+    <h5 class="alert-heading">⚠️ Important Testing Instructions</h5>
+    <ul class="mb-0">
+      <li><strong>Always click "Initialize" first</strong> before testing any other actions</li>
+      <li><strong>Monitor console logs</strong> for detailed operation information and any issues</li>
+      <li>There is a <strong>container at the bottom</strong> that will automatically show the camera feed when preview is enabled</li>
+    </ul>
+  </div>
+  
+  <!-- CamMic Actions Documentation Table -->
+  <div class="mb-5">
+    <h2 class="mb-3">CamMic Actions Documentation</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 15%">Title</th>
+            <th style="width: 12%">Action</th>
+            <th style="width: 30%">Description</th>
+            <th style="width: 20%">Checklist</th>
+            <th style="width: 23%">How to Wire Up</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Initialize -->
+          <tr>
+            <td><strong>Initialize</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Initialize'); window.dispatchEvent(new CustomEvent('CamMic:Init'));">
+                Initialize
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Dispatches initialization event that sets up the CamMicPermissionsHandler system, caches UI elements, and registers event listeners.<br><br>
+              <strong>Why:</strong> Required first step to initialize the handler and prepare the system for permission requests. Must be called before any other actions.<br><br>
+              <strong>Expected:</strong> Handler initializes, UI elements are cached, event listeners are registered. System is ready for permission operations.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Handler initialized</li>
+                <li>☐ UI elements cached</li>
+                <li>☐ Event listeners registered</li>
+                <li>☐ System ready for operations</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Init'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Init'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Check Permissions -->
+          <tr>
+            <td><strong>Check Permissions</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Check Permissions'); window.dispatchEvent(new CustomEvent('CamMic:Permissions:Check'));">
+                Check
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Queries current permission states for camera and microphone without requesting permissions.<br><br>
+              <strong>Why:</strong> Allows checking permission status before making requests. Useful for determining if permissions are already granted or need to be requested.<br><br>
+              <strong>Expected:</strong> Permission states are checked and logged. Returns current state: "granted", "denied", or "prompt". No user prompt is shown.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission states queried</li>
+                <li>☐ Camera permission state returned</li>
+                <li>☐ Microphone permission state returned</li>
+                <li>☐ No permission prompt shown</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Permissions:Check'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Permissions:Check'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Watch Permissions -->
+          <tr>
+            <td><strong>Watch Permissions</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Watch Permissions'); window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStart'));">
+                Watch
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Starts monitoring permission state changes. Sets up listeners to detect when permissions are granted or denied.<br><br>
+              <strong>Why:</strong> Allows real-time detection of permission changes. Useful for updating UI when user grants/denies permissions in browser settings.<br><br>
+              <strong>Expected:</strong> Permission watching starts. System will detect and log permission changes. Events are fired when permissions change.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission watching started</li>
+                <li>☐ Listeners registered for changes</li>
+                <li>☐ Changes will be detected</li>
+                <li>☐ Watching state is active</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStart'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStart'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Stop Watching -->
+          <tr>
+            <td><strong>Stop Watching</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Stop Watching'); window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStop'));">
+                Stop
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Stops monitoring permission state changes. Removes listeners and cleans up watching functionality.<br><br>
+              <strong>Why:</strong> Stops permission watching when no longer needed. Helps conserve resources and clean up event listeners.<br><br>
+              <strong>Expected:</strong> Permission watching stops. Listeners are removed. System no longer detects permission changes.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission watching stopped</li>
+                <li>☐ Listeners removed</li>
+                <li>☐ Watching state is inactive</li>
+                <li>☐ Resources cleaned up</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStop'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Permissions:WatchStop'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Request Camera -->
+          <tr>
+            <td><strong>Request Camera</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Request Camera'); window.dispatchEvent(new CustomEvent('CamMic:Request:Camera'));">
+                Request
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Requests camera permission from the user. Shows browser permission prompt if not already granted.<br><br>
+              <strong>Why:</strong> Directly requests camera access without orchestrating full device setup. Useful for simple permission requests.<br><br>
+              <strong>Expected:</strong> Browser permission prompt appears for camera. User grants/denies. Permission state is updated. No device selection or preview is started.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission prompt shown</li>
+                <li>☐ User responds to prompt</li>
+                <li>☐ Permission state updated</li>
+                <li>☐ Camera permission granted or denied</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Request:Camera'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Request:Camera'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Request Microphone -->
+          <tr>
+            <td><strong>Request Microphone</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Request Microphone'); window.dispatchEvent(new CustomEvent('CamMic:Request:Microphone'));">
+                Request
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Requests microphone permission from the user. Shows browser permission prompt if not already granted.<br><br>
+              <strong>Why:</strong> Directly requests microphone access without orchestrating full device setup. Useful for simple permission requests.<br><br>
+              <strong>Expected:</strong> Browser permission prompt appears for microphone. User grants/denies. Permission state is updated. No device selection or streams are started.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission prompt shown</li>
+                <li>☐ User responds to prompt</li>
+                <li>☐ Permission state updated</li>
+                <li>☐ Microphone permission granted or denied</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Request:Microphone'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Request:Microphone'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Request Both -->
+          <tr>
+            <td><strong>Request Both</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Request Both'); window.dispatchEvent(new CustomEvent('CamMic:Request:Both'));">
+                Request
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Requests both camera and microphone permissions from the user. Shows browser permission prompts if not already granted.<br><br>
+              <strong>Why:</strong> Directly requests both permissions without orchestrating full device setup. Useful for simple permission requests for both devices.<br><br>
+              <strong>Expected:</strong> Browser permission prompts appear for camera and microphone. User grants/denies. Permission states are updated. No device selection or streams are started.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permission prompts shown</li>
+                <li>☐ User responds to prompts</li>
+                <li>☐ Permission states updated</li>
+                <li>☐ Both camera and microphone permissions granted or denied</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Request:Both'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Request:Both'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- List Devices -->
+          <tr>
+            <td><strong>List Devices</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] List Devices'); window.dispatchEvent(new CustomEvent('CamMic:Devices:List'));">
+                List
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Queries and lists all available camera and microphone devices connected to the system.<br><br>
+              <strong>Why:</strong> Allows discovery of available devices. Useful for device selection UI or debugging device availability.<br><br>
+              <strong>Expected:</strong> Available devices are queried and logged. List includes device IDs, labels, and device information. Devices are available for selection.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Devices queried from system</li>
+                <li>☐ Camera devices listed</li>
+                <li>☐ Microphone devices listed</li>
+                <li>☐ Device information logged</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Devices:List'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Devices:List'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Stop Streams -->
+          <tr>
+            <td><strong>Stop Streams</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Stop Streams'); window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));">
+                Stop
+  </button>
+            </td>
+            <td>
+              <div style="background-color: #d1ecf1; border: 1px solid #0d6efd; border-radius: 4px; padding: 8px; margin-bottom: 10px; color: #0c5460;">
+                <strong style="color: #0d6efd;">⚠️ Note:</strong> This action will only stop streams if there are active streams running. If no streams are active, this action will have no effect.
+              </div>
+              <strong>How:</strong> Stops all active camera and microphone media streams. Releases device access and cleans up resources.<br><br>
+              <strong>Why:</strong> Properly releases device access when streams are no longer needed. Important for resource management and user privacy.<br><br>
+              <strong>Expected:</strong> All active streams are stopped. Device tracks are stopped. Streams are released. Resources are cleaned up.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ All active streams stopped</li>
+                <li>☐ Camera tracks stopped</li>
+                <li>☐ Microphone tracks stopped</li>
+                <li>☐ Resources cleaned up</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Streams:Stop'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Start Video Preview -->
+          <tr>
+            <td><strong>Start Video Preview</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Start Video Preview'); window.dispatchEvent(new CustomEvent('CamMic:Preview:Start'));">
+                Start
+  </button>
+            </td>
+            <td>
+              <div style="background-color: #d1ecf1; border: 1px solid #0d6efd; border-radius: 4px; padding: 8px; margin-bottom: 10px; color: #0c5460;">
+                <strong style="color: #0d6efd;">⚠️ Note:</strong> This action requires camera permissions to be granted first. If permissions are not granted, this action will fail. Use "Request Camera" or "Orchestrate Camera Only" first to obtain permissions.
+              </div>
+              <strong>How:</strong> Starts video preview by accessing camera and displaying feed in the video preview element.<br><br>
+              <strong>Why:</strong> Allows starting video preview independently of orchestration. Useful for manual preview control or when permissions are already granted.<br><br>
+              <strong>Expected:</strong> Video preview starts. Camera stream is accessed. Video element displays live camera feed. Preview is visible.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Camera stream accessed</li>
+                <li>☐ Video element updated</li>
+                <li>☐ Preview feed displayed</li>
+                <li>☐ Preview is active</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Preview:Start'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Preview:Start'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Orchestrate Both -->
+          <tr>
+            <td><strong>Orchestrate Both</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Orchestrate Both'); window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));">
+                Orchestrate
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Full orchestration flow: requests permissions, selects devices, starts streams, and enables video preview for both camera and microphone.<br><br>
+              <strong>Why:</strong> Complete automated setup for video calls. Handles the entire workflow from permissions to active streams with preview.<br><br>
+              <strong>Expected:</strong> Permissions requested, devices selected, streams started, video preview enabled. Completion event fired when done.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permissions requested</li>
+                <li>☐ Devices selected</li>
+                <li>☐ Streams started</li>
+                <li>☐ Video preview enabled</li>
+                <li>☐ Completion event fired</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Orchestrate Both (No Preview) -->
+          <tr>
+            <td><strong>Orchestrate Both (No Preview)</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Orchestrate Both (No Preview)'); window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));">
+                Orchestrate
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Full orchestration flow without video preview: requests permissions, selects devices, starts streams, but does not enable video preview.<br><br>
+              <strong>Why:</strong> Complete setup for audio-only calls or when preview should be manually controlled. Useful when video preview isn't needed immediately.<br><br>
+              <strong>Expected:</strong> Permissions requested, devices selected, streams started, but video preview NOT enabled. Completion event fired when done.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Permissions requested</li>
+                <li>☐ Devices selected</li>
+                <li>☐ Streams started</li>
+                <li>☐ Video preview NOT enabled</li>
+                <li>☐ Completion event fired</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Orchestrate Mic Only -->
+          <tr>
+            <td><strong>Orchestrate Mic Only</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Orchestrate Mic Only'); window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));">
+                Orchestrate
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Full orchestration flow for microphone only: requests microphone permission, selects microphone device, starts audio stream.<br><br>
+              <strong>Why:</strong> Complete automated setup for audio-only calls. Handles the entire workflow from permissions to active microphone stream.<br><br>
+              <strong>Expected:</strong> Microphone permission requested, device selected, audio stream started. Completion event fired when done. No camera access.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Microphone permission requested</li>
+                <li>☐ Microphone device selected</li>
+                <li>☐ Audio stream started</li>
+                <li>☐ No camera access</li>
+                <li>☐ Completion event fired</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Orchestrate Camera Only -->
+          <tr>
+            <td><strong>Orchestrate Camera Only</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Orchestrate Camera Only'); window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera'));">
+                Orchestrate
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Full orchestration flow for camera only: requests camera permission, selects camera device, starts video stream, enables preview.<br><br>
+              <strong>Why:</strong> Complete automated setup for video-only scenarios. Handles the entire workflow from permissions to active camera stream with preview.<br><br>
+              <strong>Expected:</strong> Camera permission requested, device selected, video stream started, preview enabled. Completion event fired when done. No microphone access.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Camera permission requested</li>
+                <li>☐ Camera device selected</li>
+                <li>☐ Video stream started</li>
+                <li>☐ Video preview enabled</li>
+                <li>☐ No microphone access</li>
+                <li>☐ Completion event fired</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Orchestrate Camera Only (No Preview) -->
+          <tr>
+            <td><strong>Orchestrate Camera Only (No Preview)</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Orchestrate Camera Only (No Preview)'); window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera:NoPreview'));">
+                Orchestrate
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Full orchestration flow for camera only without preview: requests camera permission, selects device, starts stream, but does not enable preview.<br><br>
+              <strong>Why:</strong> Complete setup for camera access without automatic preview. Useful for photo capture or when preview should be manually controlled.<br><br>
+              <strong>Expected:</strong> Camera permission requested, device selected, video stream started, but preview NOT enabled. Completion event fired when done.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Camera permission requested</li>
+                <li>☐ Camera device selected</li>
+                <li>☐ Video stream started</li>
+                <li>☐ Video preview NOT enabled</li>
+                <li>☐ Completion event fired</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera:NoPreview'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera:NoPreview'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Get Device List -->
+          <tr>
+            <td><strong>Get Device List</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Get Device List'); window.dispatchEvent(new CustomEvent('CamMic:DeviceList:Check'));">
+                Get List
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Retrieves and displays the current list of available camera and microphone devices with their current selections.<br><br>
+              <strong>Why:</strong> Shows current device state including which devices are available and which are currently selected. Useful for debugging and UI updates.<br><br>
+              <strong>Expected:</strong> Device list is retrieved and logged. Shows available devices, selected devices, and device information. UI may be updated with device selections.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Event dispatched successfully</li>
+                <li>☐ Device list retrieved</li>
+                <li>☐ Available devices listed</li>
+                <li>☐ Selected devices shown</li>
+                <li>☐ Device information logged</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                // Direct dispatch<br>
+                window.dispatchEvent(new CustomEvent('CamMic:DeviceList:Check'));<br>
+                <br>
+                // Or from button click<br>
+                button.onclick = () => {<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:DeviceList:Check'));<br>
+                };
+              </code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Test Wait Flows Documentation Table -->
+  <div class="mb-5">
+    <h2 class="mb-3">Test Wait Flows Documentation</h2>
+    <div class="table-responsive">
+      <table class="table table-bordered table-hover">
+        <thead class="table-light">
+          <tr>
+            <th style="width: 15%">Title</th>
+            <th style="width: 12%">Action</th>
+            <th style="width: 30%">Description</th>
+            <th style="width: 20%">Checklist</th>
+            <th style="width: 23%">How to Wire Up</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Test Wait Flow: Both -->
+          <tr>
+            <td><strong>Both (Cam + Mic)</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Test Wait Flow - Both'); window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Both'));">
+                Test Flow
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Listens for test trigger, registers completion listener, dispatches orchestration event, waits for completion.<br><br>
+              <strong>Why:</strong> Verifies async orchestration pattern works correctly with multiple event dispatches. Ensures completion is captured before proceeding.<br><br>
+              <strong>Expected:</strong> Console logs show Start → Dispatch → Complete → SUCCESS (if permissions granted) or FAILED (if denied). Completion event contains mode: "both", success: boolean, permissions object.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Completion listener registered before dispatch</li>
+                <li>☐ Orchestration event dispatched correctly</li>
+                <li>☐ Completion event received with detail.success</li>
+                <li>☐ Mode matches "both"</li>
+                <li>☐ Permissions object contains camera and microphone states</li>
+                <li>☐ Listener cleaned up after completion</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                window.addEventListener('CamMic:Test:WaitFlow:Both', function() {<br>
+                &nbsp;&nbsp;const onComplete = (ev) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;const detail = ev.detail || {};<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;// Handle success/failure<br>
+                &nbsp;&nbsp;};<br>
+                &nbsp;&nbsp;window.addEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));<br>
+                });<br>
+                <br>
+                // Trigger: window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Both'));
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Test Wait Flow: Microphone Only -->
+          <tr>
+            <td><strong>Microphone Only</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Test Wait Flow - Mic Only'); window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Microphone'));">
+                Test Flow
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Same pattern as Both, but for microphone-only requests. Registers listener, dispatches microphone orchestration, waits for completion.<br><br>
+              <strong>Why:</strong> Verifies microphone-only flows work independently. Tests that single-permission requests complete correctly without camera involvement.<br><br>
+              <strong>Expected:</strong> Console logs show Start → Dispatch → Complete → SUCCESS (if mic granted) or FAILED. Completion event contains mode: "microphone", success: boolean, permissions object with microphone state.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Completion listener registered before dispatch</li>
+                <li>☐ Microphone orchestration event dispatched</li>
+                <li>☐ Completion event received with detail.success</li>
+                <li>☐ Mode matches "microphone"</li>
+                <li>☐ Only microphone permission checked (not camera)</li>
+                <li>☐ Listener cleaned up after completion</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                window.addEventListener('CamMic:Test:WaitFlow:Microphone', function() {<br>
+                &nbsp;&nbsp;const onComplete = (ev) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;const detail = ev.detail || {};<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;// Handle success/failure<br>
+                &nbsp;&nbsp;};<br>
+                &nbsp;&nbsp;window.addEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));<br>
+                });<br>
+                <br>
+                // Trigger: window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Microphone'));
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Test Wait Flow: Camera Only -->
+          <tr>
+            <td><strong>Camera Only</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Test Wait Flow - Camera Only'); window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Camera'));">
+                Test Flow
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Same pattern, but for camera-only requests with video preview enabled. Registers listener, dispatches camera orchestration, waits for completion.<br><br>
+              <strong>Why:</strong> Verifies camera-only flows work independently with preview enabled. Tests permission requests and video preview activation together.<br><br>
+              <strong>Expected:</strong> Console logs show Start → Dispatch → Complete → SUCCESS (if camera granted) or FAILED. Completion event contains mode: "camera", success: boolean, previewEnabled: true, permissions object.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Completion listener registered before dispatch</li>
+                <li>☐ Camera orchestration event dispatched</li>
+                <li>☐ Completion event received with detail.success</li>
+                <li>☐ Mode matches "camera"</li>
+                <li>☐ Video preview enabled (previewEnabled: true)</li>
+                <li>☐ Only camera permission checked (not microphone)</li>
+                <li>☐ Listener cleaned up after completion</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                window.addEventListener('CamMic:Test:WaitFlow:Camera', function() {<br>
+                &nbsp;&nbsp;const onComplete = (ev) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;const detail = ev.detail || {};<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;// Handle success/failure<br>
+                &nbsp;&nbsp;};<br>
+                &nbsp;&nbsp;window.addEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera'));<br>
+                });<br>
+                <br>
+                // Trigger: window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Camera'));
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Test Wait Flow: Both (No Preview) -->
+          <tr>
+            <td><strong>Both (No Preview)</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Test Wait Flow - Both (No Preview)'); window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Both:NoPreview'));">
+                Test Flow
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Same pattern as Both, but with no preview flag. Requests both permissions without starting video preview automatically.<br><br>
+              <strong>Why:</strong> Verifies permissions can be requested without automatic video preview. Useful for audio-only calls or when preview should be manually controlled.<br><br>
+              <strong>Expected:</strong> Console logs show Start → Dispatch → Complete → SUCCESS (if permissions granted) or FAILED. Completion event contains mode: "both", success: boolean, previewEnabled: false, permissions object.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Completion listener registered before dispatch</li>
+                <li>☐ Both orchestration event dispatched with NoPreview flag</li>
+                <li>☐ Completion event received with detail.success</li>
+                <li>☐ Mode matches "both"</li>
+                <li>☐ Preview disabled (previewEnabled: false)</li>
+                <li>☐ Both camera and microphone permissions checked</li>
+                <li>☐ Video preview not started automatically</li>
+                <li>☐ Listener cleaned up after completion</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                window.addEventListener('CamMic:Test:WaitFlow:Both:NoPreview', function() {<br>
+                &nbsp;&nbsp;const onComplete = (ev) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;const detail = ev.detail || {};<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;if (detail.success && detail.previewEnabled === false) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Handle success without preview<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;};<br>
+                &nbsp;&nbsp;window.addEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));<br>
+                });<br>
+                <br>
+                // Trigger: window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Both:NoPreview'));
+              </code>
+            </td>
+          </tr>
+          
+          <!-- Test Wait Flow: Camera Only (No Preview) -->
+          <tr>
+            <td><strong>Camera Only (No Preview)</strong></td>
+            <td>
+              <button class="btn btn-primary btn-sm" onclick="console.log('[HTML] [onclick] Test Wait Flow - Camera Only (No Preview)'); window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Camera:NoPreview'));">
+                Test Flow
+  </button>
+            </td>
+            <td>
+              <strong>How:</strong> Same pattern as Camera Only, but with no preview flag. Requests camera permission without starting video preview automatically.<br><br>
+              <strong>Why:</strong> Verifies camera permissions can be requested without automatic preview. Useful when preview should be manually controlled or for photo capture scenarios without live preview.<br><br>
+              <strong>Expected:</strong> Console logs show Start → Dispatch → Complete → SUCCESS (if camera granted) or FAILED. Completion event contains mode: "camera", success: boolean, previewEnabled: false, permissions object.
+            </td>
+            <td>
+              <ul class="list-unstyled mb-0">
+                <li>☐ Completion listener registered before dispatch</li>
+                <li>☐ Camera orchestration event dispatched with NoPreview flag</li>
+                <li>☐ Completion event received with detail.success</li>
+                <li>☐ Mode matches "camera"</li>
+                <li>☐ Preview disabled (previewEnabled: false)</li>
+                <li>☐ Only camera permission checked (not microphone)</li>
+                <li>☐ Video preview not started automatically</li>
+                <li>☐ Listener cleaned up after completion</li>
+              </ul>
+            </td>
+            <td>
+              <code class="small">
+                window.addEventListener('CamMic:Test:WaitFlow:Camera:NoPreview', function() {<br>
+                &nbsp;&nbsp;const onComplete = (ev) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;const detail = ev.detail || {};<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;if (detail.success && detail.previewEnabled === false) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;// Handle success without preview<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;};<br>
+                &nbsp;&nbsp;window.addEventListener('CamMic:Orchestrate:Complete', onComplete);<br>
+                &nbsp;&nbsp;window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera:NoPreview'));<br>
+                });<br>
+                <br>
+                // Trigger: window.dispatchEvent(new CustomEvent('CamMic:Test:WaitFlow:Camera:NoPreview'));
+              </code>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+</div>
+
+<!-- Required DOM Elements -->
+<div style="margin: 20px 0;">
+  <h2>Status & Controls</h2>
+
+  <!-- Permission Prompt Icons -->
+  <div data-cam-mic-element="permission-icons" hidden>
+    <div data-cam-mic-element="need-camera" hidden>📷 Please allow camera access</div>
+    <div data-cam-mic-element="need-microphone" hidden>🎤 Please allow microphone access</div>
+  </div>
+
+  <!-- Second Set of Device Selects (Demo Multiple Selects) -->
+  <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+    <h3>Second Device Selection (Multiple Selects Demo)</h3>
+    <p class="text-muted small">This demonstrates that multiple select elements can be wired up and stay synchronized automatically.</p>
+    <label>
+      Camera:
+      <select data-camera-select></select>
+    </label>
+    <br /><br />
+    <label>
+      Microphone:
+      <select data-microphone-select></select>
+    </label>
+  </div>
+
+  <!-- Demo Video Preview Elements (Multiple Previews) -->
+  <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+    <h3>Multiple Video Previews Demo</h3>
+    <p class="text-muted small">This demonstrates that multiple video preview elements with data-cam-preview attribute will sync with the master video automatically.</p>
+    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-top: 15px;">
+      <div style="border: 2px solid #0d6efd; border-radius: 8px; overflow: hidden; background: #000;">
+        <video data-cam-preview autoplay playsinline style="width: 200px; height: 150px; object-fit: cover; display: block;"></video>
+        <p style="margin: 5px; font-size: 0.85em; color: #6c757d; text-align: center;">Preview 1</p>
+      </div>
+      <div style="border: 2px solid #0d6efd; border-radius: 8px; overflow: hidden; background: #000;">
+        <video data-cam-preview autoplay playsinline style="width: 200px; height: 150px; object-fit: cover; display: block;"></video>
+        <p style="margin: 5px; font-size: 0.85em; color: #6c757d; text-align: center;">Preview 2</p>
+      </div>
+      <div style="border: 2px solid #0d6efd; border-radius: 8px; overflow: hidden; background: #000;">
+        <video data-cam-preview autoplay playsinline style="width: 200px; height: 150px; object-fit: cover; display: block;"></video>
+        <p style="margin: 5px; font-size: 0.85em; color: #6c757d; text-align: center;">Preview 3</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reload Required Banner -->
+  <div data-cam-mic-element="reload-required" hidden style="background: #ffcccc; padding: 10px; border: 1px solid #ff0000;">
+    ⚠️ Permission denied. Page will reload shortly.
+  </div>
+</div>
+
+<!-- Fixed Bottom Status Bar -->
+<div class="fixed-bottom-status">
+  <div class="status-container">
+    <!-- Loader (moved from Status & Controls) -->
+    <div data-cam-mic-element="loader" hidden>🔄 Checking Permissions...</div>
+    
+    <!-- Waiting (moved from Status & Controls) -->
+    <div data-cam-mic-element="waiting" hidden>⏳ Waiting...</div>
+    
+    <!-- Status Wrap (moved from Status & Controls) -->
+    <div class="status-section" data-cam-mic-element="status">
+      <div data-cam-mic-element="status-item" data-kind="camera">
+        <strong>Camera:</strong> <span data-cam-mic-element="status-camera"></span>
+      </div>
+      <div data-cam-mic-element="status-item" data-kind="microphone">
+        <strong>Microphone:</strong> <span data-cam-mic-element="status-microphone"></span>
+      </div>
+    </div>
+    
+    <!-- Device Selection (moved from Status & Controls) -->
+    <div class="status-section" data-cam-mic-element="device-select">
+      <label>Camera:</label>
+      <select data-cam-mic-element="video-select"></select>
+      <span data-cam-mic-element="selected-camera-label" style="font-size: 0.85em; color: #6c757d;"></span>
+      <label style="margin-left: 10px;">Mic:</label>
+      <select data-cam-mic-element="audio-select"></select>
+      <span data-cam-mic-element="selected-microphone-label" style="font-size: 0.85em; color: #6c757d;"></span>
+    </div>
+    
+    <!-- Video Preview (moved from Status & Controls) -->
+    <div class="video-preview-container">
+      <video data-cam-mic-element="video-preview" autoplay playsinline></video>
+    </div>
+  </div>
+</div>
+
+<!-- Footer with selects (hidden - source of truth, created automatically if missing) -->
+<footer style="margin-top: 40px; padding: 20px; border-top: 1px solid #ccc; display: none;" hidden>
+  <label>
+    Camera:
+    <select data-camera-select hidden></select>
+  </label>
+  <br />
+  <label>
+    Microphone:
+    <select data-microphone-select hidden></select>
+  </label>
+</footer>
+
+<!-- Load Cam/Mic handler (contains both Utility and Handler) -->
+<script src="./camMicPermissionsUtility.js"></script>
+<script src="./camMicPermissionsHandler.js"></script>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+
+
+
+
+
+
+<!-- Footer selects are managed by CamMicPermissionsHandler._ensureFooterSelects() -->
+<!-- They are hidden and serve as source of truth -->
+
+<!-- Test Wait Flow: External flow that waits for orchestration completion -->
+<script>
+  (function() {
+    /**
+     * Test Wait Flow for Both (Cam + Mic)
+     * 
+     * This flow demonstrates the async orchestration pattern where we:
+     * 1. Listen for the test wait flow event trigger
+     * 2. Set up a completion listener BEFORE dispatching the orchestration
+     * 3. Dispatch the orchestration event
+     * 4. Wait for the completion event to verify successful permission handling
+     * 
+     * This pattern ensures we can verify that multiple event dispatches work correctly
+     * and that the orchestration completes before proceeding.
+     */
+    window.addEventListener('CamMic:Test:WaitFlow:Both', function() {
+      // Log the start of the test wait flow
+      console.log(`[TestWaitFlow] [Both] [Start] {}`);
+      
+      // Define completion handler that will be called when orchestration finishes
+      // This handler is registered BEFORE dispatching the orchestration event
+      // to ensure it can capture the completion event
+      const onComplete = function(ev) {
+        // Remove the event listener to prevent memory leaks
+        // This cleanup happens after the completion event is received
+        window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);
+        // Extract detail object from event, defaulting to empty object if missing
+        const detail = ev.detail || {};
+        // Log the completion event with all details
+        console.log(`[TestWaitFlow] [Both] [Complete] ${JSON.stringify(detail)}`);
+        
+        // Check if orchestration was successful and mode matches expected value
+        // Success indicates both camera and microphone permissions were granted
+        if (detail.success && detail.mode === 'both') {
+          // Log success message confirming permissions were granted
+          // This confirms the wait flow pattern works correctly with multiple dispatches
+          console.log(`[TestWaitFlow] [Both] [SUCCESS] Cam/Mic permissions granted! I waited until AFTER cam mic so we can be sure. Multiple dispatches work correctly.`);
+        } else {
+          // Log warning if orchestration failed or mode doesn't match
+          // This helps identify issues with permission requests or mode detection
+          console.warn(`[TestWaitFlow] [Both] [FAILED] ${JSON.stringify({ permissions: detail.permissions || {} })}`);
+        }
+      };
+      
+      // Register the completion handler to listen for orchestration completion
+      // This must be done BEFORE dispatching the orchestration event
+      window.addEventListener('CamMic:Orchestrate:Complete', onComplete);
+      
+      // Dispatch the orchestration event to start the camera + microphone flow
+      // This triggers the CamMicPermissionsHandler to request permissions and set up devices
+      console.log(`[TestWaitFlow] [Both] [Dispatch] ${JSON.stringify({ event: 'CamMic:Orchestrate:Both' })}`);
+      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both'));
+    });
+
+    /**
+     * Test Wait Flow for Microphone Only
+     * 
+     * This flow demonstrates the async orchestration pattern for microphone-only requests.
+     * The flow:
+     * 1. Listens for the test wait flow event trigger
+     * 2. Sets up a completion listener BEFORE dispatching the orchestration
+     * 3. Dispatches the microphone-only orchestration event
+     * 4. Waits for the completion event to verify successful microphone permission handling
+     * 
+     * This pattern ensures we can verify microphone-only flows work independently
+     * and that the orchestration completes before proceeding.
+     */
+    window.addEventListener('CamMic:Test:WaitFlow:Microphone', function() {
+      // Log the start of the test wait flow
+      console.log(`[TestWaitFlow] [Microphone] [Start] {}`);
+      
+      // Define completion handler that will be called when orchestration finishes
+      // This handler is registered BEFORE dispatching the orchestration event
+      // to ensure it can capture the completion event
+      const onComplete = function(ev) {
+        // Remove the event listener to prevent memory leaks
+        // This cleanup happens after the completion event is received
+        window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);
+        // Extract detail object from event, defaulting to empty object if missing
+        const detail = ev.detail || {};
+        // Log the completion event with all details
+        console.log(`[TestWaitFlow] [Microphone] [Complete] ${JSON.stringify(detail)}`);
+        
+        // Check if orchestration was successful and mode matches expected value
+        // Success indicates microphone permissions were granted
+        if (detail.success && detail.mode === 'microphone') {
+          // Log success message confirming permissions were granted
+          // This confirms the wait flow pattern works correctly with multiple dispatches
+          console.log(`[TestWaitFlow] [Microphone] [SUCCESS] Mic permissions granted! I waited until AFTER cam mic so we can be sure. Multiple dispatches work correctly.`);
+        } else {
+          // Log warning if orchestration failed or mode doesn't match
+          // This helps identify issues with permission requests or mode detection
+          console.warn(`[TestWaitFlow] [Microphone] [FAILED] ${JSON.stringify({ permissions: detail.permissions || {} })}`);
+        }
+      };
+      
+      // Register the completion handler to listen for orchestration completion
+      // This must be done BEFORE dispatching the orchestration event
+      window.addEventListener('CamMic:Orchestrate:Complete', onComplete);
+      
+      // Dispatch the orchestration event to start the microphone-only flow
+      // This triggers the CamMicPermissionsHandler to request microphone permissions and set up devices
+      console.log(`[TestWaitFlow] [Microphone] [Dispatch] ${JSON.stringify({ event: 'CamMic:Orchestrate:Microphone' })}`);
+      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Microphone'));
+    });
+
+    /**
+     * Test Wait Flow for Camera Only
+     * 
+     * This flow demonstrates the async orchestration pattern for camera-only requests.
+     * The flow:
+     * 1. Listens for the test wait flow event trigger
+     * 2. Sets up a completion listener BEFORE dispatching the orchestration
+     * 3. Dispatches the camera-only orchestration event
+     * 4. Waits for the completion event to verify successful camera permission handling
+     * 
+     * This pattern ensures we can verify camera-only flows work independently
+     * and that the orchestration completes before proceeding.
+     */
+    window.addEventListener('CamMic:Test:WaitFlow:Camera', function() {
+      // Log the start of the test wait flow
+      console.log(`[TestWaitFlow] [Camera] [Start] {}`);
+      
+      // Define completion handler that will be called when orchestration finishes
+      // This handler is registered BEFORE dispatching the orchestration event
+      // to ensure it can capture the completion event
+      const onComplete = function(ev) {
+        // Remove the event listener to prevent memory leaks
+        // This cleanup happens after the completion event is received
+        window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);
+        // Extract detail object from event, defaulting to empty object if missing
+        const detail = ev.detail || {};
+        // Log the completion event with all details
+        console.log(`[TestWaitFlow] [Camera] [Complete] ${JSON.stringify(detail)}`);
+        
+        // Check if orchestration was successful and mode matches expected value
+        // Success indicates camera permissions were granted
+        if (detail.success && detail.mode === 'camera') {
+          // Log success message confirming permissions were granted
+          // This confirms the wait flow pattern works correctly with multiple dispatches
+          console.log(`[TestWaitFlow] [Camera] [SUCCESS] Camera permissions granted! I waited until AFTER cam mic so we can be sure. Multiple dispatches work correctly.`);
+        } else {
+          // Log warning if orchestration failed or mode doesn't match
+          // This helps identify issues with permission requests or mode detection
+          console.warn(`[TestWaitFlow] [Camera] [FAILED] ${JSON.stringify({ permissions: detail.permissions || {} })}`);
+        }
+      };
+      
+      // Register the completion handler to listen for orchestration completion
+      // This must be done BEFORE dispatching the orchestration event
+      window.addEventListener('CamMic:Orchestrate:Complete', onComplete);
+      
+      // Dispatch the orchestration event to start the camera-only flow
+      // This triggers the CamMicPermissionsHandler to request camera permissions and set up devices
+      console.log(`[TestWaitFlow] [Camera] [Dispatch] ${JSON.stringify({ event: 'CamMic:Orchestrate:Camera' })}`);
+      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera'));
+    });
+
+    /**
+     * Test Wait Flow for Both (Cam + Mic) - No Preview
+     * 
+     * This flow demonstrates the async orchestration pattern for both camera and microphone
+     * requests without enabling video preview. The flow:
+     * 1. Listens for the test wait flow event trigger
+     * 2. Sets up a completion listener BEFORE dispatching the orchestration
+     * 3. Dispatches the both orchestration event with no preview flag
+     * 4. Waits for the completion event to verify successful permission handling without preview
+     * 
+     * This pattern ensures we can verify that permissions can be requested without
+     * automatically starting video preview, which is useful for audio-only calls or
+     * when preview should be manually controlled.
+     */
+    window.addEventListener('CamMic:Test:WaitFlow:Both:NoPreview', function() {
+      // Log the start of the test wait flow
+      console.log(`[TestWaitFlow] [Both:NoPreview] [Start] {}`);
+      
+      // Define completion handler that will be called when orchestration finishes
+      // This handler is registered BEFORE dispatching the orchestration event
+      // to ensure it can capture the completion event
+      const onComplete = function(ev) {
+        // Remove the event listener to prevent memory leaks
+        // This cleanup happens after the completion event is received
+        window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);
+        // Extract detail object from event, defaulting to empty object if missing
+        const detail = ev.detail || {};
+        // Log the completion event with all details
+        console.log(`[TestWaitFlow] [Both:NoPreview] [Complete] ${JSON.stringify(detail)}`);
+        
+        // Check if orchestration was successful, mode matches expected value, and preview is disabled
+        // Success indicates both camera and microphone permissions were granted without preview
+        if (detail.success && detail.mode === 'both' && detail.previewEnabled === false) {
+          // Log success message confirming permissions were granted and preview is disabled
+          // This confirms the wait flow pattern works correctly with no preview mode
+          console.log(`[TestWaitFlow] [Both:NoPreview] [SUCCESS] Cam/Mic permissions granted! Preview disabled. I waited until AFTER cam mic so we can be sure. Multiple dispatches work correctly.`);
+        } else {
+          // Log warning if orchestration failed, mode doesn't match, or preview is enabled
+          // This helps identify issues with permission requests, mode detection, or preview control
+          console.warn(`[TestWaitFlow] [Both:NoPreview] [FAILED] ${JSON.stringify({ permissions: detail.permissions || {}, previewEnabled: detail.previewEnabled })}`);
+        }
+      };
+      
+      // Register the completion handler to listen for orchestration completion
+      // This must be done BEFORE dispatching the orchestration event
+      window.addEventListener('CamMic:Orchestrate:Complete', onComplete);
+      
+      // Dispatch the orchestration event to start the camera + microphone flow without preview
+      // This triggers the CamMicPermissionsHandler to request permissions and set up devices
+      // without automatically enabling video preview
+      console.log(`[TestWaitFlow] [Both:NoPreview] [Dispatch] ${JSON.stringify({ event: 'CamMic:Orchestrate:Both:NoPreview' })}`);
+      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Both:NoPreview'));
+    });
+
+    /**
+     * Test Wait Flow for Camera Only - No Preview
+     * 
+     * This flow demonstrates the async orchestration pattern for camera-only requests
+     * without enabling video preview. The flow:
+     * 1. Listens for the test wait flow event trigger
+     * 2. Sets up a completion listener BEFORE dispatching the orchestration
+     * 3. Dispatches the camera-only orchestration event with no preview flag
+     * 4. Waits for the completion event to verify successful camera permission handling without preview
+     * 
+     * This pattern ensures we can verify that camera permissions can be requested without
+     * automatically starting video preview, which is useful when preview should be manually controlled
+     * or when camera is needed for other purposes (like photo capture) without live preview.
+     */
+    window.addEventListener('CamMic:Test:WaitFlow:Camera:NoPreview', function() {
+      // Log the start of the test wait flow
+      console.log(`[TestWaitFlow] [Camera:NoPreview] [Start] {}`);
+      
+      // Define completion handler that will be called when orchestration finishes
+      // This handler is registered BEFORE dispatching the orchestration event
+      // to ensure it can capture the completion event
+      const onComplete = function(ev) {
+        // Remove the event listener to prevent memory leaks
+        // This cleanup happens after the completion event is received
+        window.removeEventListener('CamMic:Orchestrate:Complete', onComplete);
+        // Extract detail object from event, defaulting to empty object if missing
+        const detail = ev.detail || {};
+        // Log the completion event with all details
+        console.log(`[TestWaitFlow] [Camera:NoPreview] [Complete] ${JSON.stringify(detail)}`);
+        
+        // Check if orchestration was successful, mode matches expected value, and preview is disabled
+        // Success indicates camera permissions were granted without preview
+        if (detail.success && detail.mode === 'camera' && detail.previewEnabled === false) {
+          // Log success message confirming permissions were granted and preview is disabled
+          // This confirms the wait flow pattern works correctly with no preview mode
+          console.log(`[TestWaitFlow] [Camera:NoPreview] [SUCCESS] Camera permissions granted! Preview disabled. I waited until AFTER cam mic so we can be sure. Multiple dispatches work correctly.`);
+        } else {
+          // Log warning if orchestration failed, mode doesn't match, or preview is enabled
+          // This helps identify issues with permission requests, mode detection, or preview control
+          console.warn(`[TestWaitFlow] [Camera:NoPreview] [FAILED] ${JSON.stringify({ permissions: detail.permissions || {}, previewEnabled: detail.previewEnabled })}`);
+        }
+      };
+      
+      // Register the completion handler to listen for orchestration completion
+      // This must be done BEFORE dispatching the orchestration event
+      window.addEventListener('CamMic:Orchestrate:Complete', onComplete);
+      
+      // Dispatch the orchestration event to start the camera-only flow without preview
+      // This triggers the CamMicPermissionsHandler to request camera permissions and set up devices
+      // without automatically enabling video preview
+      console.log(`[TestWaitFlow] [Camera:NoPreview] [Dispatch] ${JSON.stringify({ event: 'CamMic:Orchestrate:Camera:NoPreview' })}`);
+      window.dispatchEvent(new CustomEvent('CamMic:Orchestrate:Camera:NoPreview'));
+    });
+    
+    // URL Parameter State Auto-Select (Debug Only)
+    // Check for ?state=caller:callWaiting in URL and auto-select from debug dropdown
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const stateParam = urlParams.get('state');
+      if (stateParam) {
+        console.log('[Debug] URL state parameter detected:', stateParam);
+        // Wait for DOM to be ready
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => {
+            const stateSelect = document.getElementById('stateSelect');
+            if (stateSelect) {
+              stateSelect.value = stateParam;
+              console.log('[Debug] Auto-selected state from URL:', stateParam);
+              // Trigger the change event to dispatch the state
+              stateSelect.dispatchEvent(new Event('change'));
+            }
+          });
+        } else {
+          // DOM already loaded
+          const stateSelect = document.getElementById('stateSelect');
+          if (stateSelect) {
+            stateSelect.value = stateParam;
+            console.log('[Debug] Auto-selected state from URL:', stateParam);
+            // Trigger the change event to dispatch the state
+            stateSelect.dispatchEvent(new Event('change'));
+          }
+        }
+      }
+    })();
+  })();
+</script>
+</div> <!-- End container -->
+</body>
 </body>
 
 </html>

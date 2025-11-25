@@ -38,15 +38,15 @@
           ref="content"
         >
           <div>
-            <p class="text-white font-medium text-base">Blur Background</p>
-            <div class="mt-[10px] grid grid-cols-2 gap-2">
-              <div
-                class="w-full text-sm font-medium border border-white/50 p-[10px] text-white rounded-lg flex justify-center items-center cursor-pointer active"
-                data-apply-background-filter-blur="none">No Blur</div>
-              <div
-                class="w-full text-sm font-medium border border-white/50 p-[10px] text-white rounded-lg flex justify-center items-center cursor-pointer"
-                data-apply-background-filter-blur="high">With Blur</div>
-            </div>
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                :checked="blurEnabled"
+                @change="handleBlurChange"
+                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span class="text-white font-medium text-base">Apply Background Blur</span>
+            </label>
           </div>
 
           <div>
@@ -55,8 +55,11 @@
               <div
                 v-for="i in 6"
                 :key="i"
-                :data-apply-background-filter-predefined="'bg' + i"
-                class="h-[72px] w-[86px] border border-[#FFFFFF80] rounded-xl overflow-hidden cursor-pointer"
+                @click="handleBackgroundClick(i, 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/backgrounds/bg' + i + '.jpg')"
+                :class="[
+                  'h-[72px] w-[86px] border rounded-xl overflow-hidden cursor-pointer',
+                  selectedBackgroundIndex === i ? 'border-[3px] border-pink-500' : 'border border-[#FFFFFF80]'
+                ]"
               >
                 <img
                   :src="'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/backgrounds/bg' + i + '.jpg'"
@@ -72,6 +75,8 @@
       const accordionId = 'settings-backgrounds-effects';
       const isOpen = ref(false);
       const content = ref(null);
+      const blurEnabled = ref(false); // Default OFF
+      const selectedBackgroundIndex = ref(null); // Track selected virtual background
 
       function onAccordionOpen(e) {
         const incomingId = e?.detail;
@@ -89,6 +94,40 @@
         await nextTick();
       }
 
+      function handleBlurChange(event) {
+        const enabled = event.target.checked;
+        blurEnabled.value = enabled;
+        
+        // Dispatch event similar to call accepted flow
+        const blurLevel = enabled ? 'high' : 'off';
+        console.log('[SettingsBackgroundsEffects] Blur changed:', blurLevel);
+        
+        document.dispatchEvent(new CustomEvent('app:background:blur', {
+          detail: {
+            enabled: enabled,
+            level: blurLevel,
+            timestamp: Date.now()
+          }
+        }));
+      }
+
+      function handleBackgroundClick(index, imageUrl) {
+        // Remove border from previously selected
+        selectedBackgroundIndex.value = index;
+        
+        // Add pink border via class binding
+        console.log('[SettingsBackgroundsEffects] Background clicked:', imageUrl);
+        
+        // Dispatch event similar to call controls
+        document.dispatchEvent(new CustomEvent('app:background:image', {
+          detail: {
+            imageUrl: imageUrl,
+            type: 'virtual-background',
+            timestamp: Date.now()
+          }
+        }));
+      }
+
       onMounted(() => {
         window.addEventListener('accordion-open', onAccordionOpen);
       });
@@ -97,7 +136,15 @@
         window.removeEventListener('accordion-open', onAccordionOpen);
       });
 
-      return { isOpen, content, toggle };
+      return { 
+        isOpen, 
+        content, 
+        toggle, 
+        blurEnabled, 
+        handleBlurChange,
+        selectedBackgroundIndex,
+        handleBackgroundClick
+      };
     },
   });
 

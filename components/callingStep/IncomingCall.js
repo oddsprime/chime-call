@@ -7,36 +7,55 @@
           show: { type: Boolean, default: false },
           callerName: { type: String, default: 'SirStrawberry' },
           callerHandle: { type: String, default: '@sammisjelly187' },
-          avatarSrc: { type: String, default: 'https://fansocial-user-media.s3-accelerate.amazonaws.com/user-869/images/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg/kf1amBZt0jnKUACX4ir3ICx7EbF3Jg.png' },
+          avatarSrc: { type: String, default: '' },
+          userInitials: { type: String, default: '' },
           loaderSrc: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/green-loader-2.svg' },
-          acceptIcon: { type: String, default: 'https://i.ibb.co.com/tp6wnC7q/phone-1.webp' },
-          declineIcon: { type: String, default: 'https://i.ibb.co.com/20sMWhjg/phone-x-1-1.webp' },
-          optionsIcon: { type: String, default: 'https://i.ibb.co.com/67sJstbJ/dots-horizontal-gray.webp' },
+          acceptIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-1.svg' },
+          declineIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-x.svg' },
+          optionsIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/dots-horizontal-gray.svg' },
+          endCallIcon: { type: String, default: 'https://i.ibb.co.com/nshWZFfD/Communication.webp' },
           heading: { type: String, default: 'Incoming Video Call' },
+          headerIcon: { type: String, default: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-call-01.svg' },
+          callState: { type: String, default: 'incomingVideoCall' }, // 'incomingVideoCall' | 'incomingAudioCall' | 'callAccepted'
         },
-        emits: ['accept', 'decline', 'options'],
+        emits: ['accept', 'decline', 'options', 'end-call'],
+        computed: {
+          isAccepted() {
+            return this.callState === 'callAccepted';
+          },
+          isIncoming() {
+            return this.callState === 'incomingVideoCall' || this.callState === 'incomingAudioCall';
+          },
+          headerIconSrc() {
+            return this.heading === 'Call Accepted!' 
+              ? 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/phone-incoming-02.svg'
+              : this.headerIcon;
+          }
+        },
         template: `
           <div
           v-if="show"
-            class="w-[30rem] flex flex-col justify-center items-center gap-6 p-4 rounded-[0.9375rem] bg-[#0C111DE5] relative"
+            class="w-full md:w-[30rem] lg:w-[30rem] flex flex-col justify-center items-center gap-6 px-2 py-4 md:!px-4 rounded-t-[0.9375rem] md:rounded-[0.9375rem] bg-[#0C111DE5] absolute  md:relative lg:relative bottom-0"
           >
             <!-- header -->
             <div class="flex items-center gap-2">
               <img
-                src="https://i.ibb.co.com/9khyD9Md/phone-incoming-02.webp"
-                alt="phone-incoming"
-                class="w-6 h-6"
-              />
-              <h2 class="text-lg font-bold text-white">{{ heading }}</h2>
-            </div>
+               :src="headerIconSrc"
+                 alt="phone-status"
+                 class="w-6 h-6"
+               />
+               <h2 class="text-lg font-bold text-white">{{ heading }}</h2>
+             </div>
   
             <!-- user info section -->
             <div class="flex flex-col justify-center items-center gap-2">
               <!-- avatar-container -->
               <div class="relative w-[14rem] h-[14rem] flex items-center justify-center">
-                    <div class="flex justify-center items-center w-[9.5rem] h-[9.5rem] relative rounded-blob-1 aspect-square relative overflow-hidden">
-                        <img :src="avatarSrc" alt="user" class="w-100 h-100 fit--cover absolute top-0 left-0" />
-                    </div>
+                    <DefaultAvatar
+                      :src="avatarSrc"
+                      :initial="userInitials"
+                      size="w-[9.5rem] h-[9.5rem]"
+                    />
                     <img
                     :src="loaderSrc"
                     alt="green-loader"
@@ -53,10 +72,10 @@
   
             <!-- bottom-section -->
             <div class="flex flex-col justify-center items-center gap-3 w-full">
-              <!-- button-container -->
-              <div class="flex gap-2 w-full">
+              <!-- Accept/Decline buttons - only show for incoming calls -->
+              <div v-if="isIncoming" class="flex gap-2 w-full">
                 <button
-                  @click="$emit('accept')"
+                  @click="() => { console.log('[IncomingCall] Accept button clicked'); $emit('accept'); }"
                   id="btnAccept"
                   class="flex justify-center items-center gap-1 w-full h-10 bg-[#07F468] px-3 py-2 rounded cursor-pointer"
                 >
@@ -73,8 +92,19 @@
                 </button>
               </div>
   
-              <!-- Other Options -->
-              <div class="flex justify-center items-center w-full">
+              <!-- End Call button - only show for accepted calls -->
+              <div v-if="isAccepted" >
+                <!-- cut-call -->
+                <end-call-button
+                  :icon="endCallIcon"
+                  btn-size="w-12 h-12"
+                  img-size="w-[2.2rem] h-[2.2rem]"
+                  @click="$emit('end-call')"
+                ></end-call-button>
+              </div>
+  
+              <!-- Other Options - only show for incoming calls -->
+              <div v-if="isIncoming" class="flex justify-center items-center w-full">
                 <button
                 @click="$emit('options')"
                 class="flex items-center gap-0.5 text-sm font-medium text-[#98A2B3]"
@@ -92,4 +122,8 @@
     // Expose to global scope
     global.registerIncomingCall = register;
   })(window);
-  
+
+
+  // <div class="flex justify-center items-center w-[9.5rem] h-[9.5rem] relative rounded-blob-1 aspect-square relative overflow-hidden">
+  //                       <img :src="avatarSrc || ''" :data-initials="userInitials" :data-avatar-url="avatarSrc ? avatarSrc : 'not-found'" alt="user" class="w-100 h-100 fit--cover absolute top-0 left-0" />
+  //                   </div>
