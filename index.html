@@ -230,12 +230,12 @@
         // On mobile, force 0 width since panel is absolute
         'grid-cols-[1fr_0px] md:grid-cols-[1fr_auto]': !ChimeCallSettings.callChatStatus || isMobile
       }">
-      <div class="relative w-full h-screen" data-chime-templates>
+      <div class="relative w-full h-screen bg-black/50" data-chime-templates>
         <div
           data-video-container
-          class="h-full absolute lg:p-2"
+          class="h-full absolute"
           :class="{
-            'w-full lg:[width:calc(100%-405px)]': ChimeCallSettings.callChatStatus,
+            'w-full lg:[width:calc(100%-405px)] lg:p-2': ChimeCallSettings.callChatStatus,
             'w-full': !ChimeCallSettings.callChatStatus || isMobile
           }"
 
@@ -259,7 +259,11 @@
             <div
                 id="video-containers"
                 class="relative overflow-hidden w-full h-full
-                        grid grid-cols-12 grid-rows-2 gap-3 lg:rounded-1"
+                        grid grid-cols-12 grid-rows-2 gap-3"
+                :class="{
+                  'lg:rounded-[0.4rem]': ChimeCallSettings.callChatStatus,
+                  '': !ChimeCallSettings.callChatStatus || isMobile
+                }"
                 data-layout="host_attendee">
       
               <div id="host-container" data-name="host" data-container-type="host" data-attendee-id="" data-role="host" class="tile flex items-center justify-center rounded-xl text-white video-card">

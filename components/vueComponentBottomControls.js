@@ -16,7 +16,7 @@
           const bg =
             'lg:bg-[linear-gradient(180deg,rgba(0,0,0,0)_0%,rgba(0,0,0,0.75)_100%)]';
           const widthClass = this.chimeCallSettings?.callChatStatus
-            ? 'w-full lg:[width:calc(100%-400px)]'
+            ? 'w-full lg:[width:calc(100%-413px)]'
             : 'w-full';
           return `${widthClass} ${bg} ${base}`;
         },

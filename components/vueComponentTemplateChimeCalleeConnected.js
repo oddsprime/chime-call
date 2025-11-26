@@ -161,7 +161,7 @@
                 <div class="flex items-center justify-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
                   
                 <div v-if="chimeCallSettings && !chimeCallSettings.callCamStatus" class="tooltip-wrapper bg-white/70 flex justify-center absolute top-[-70px] w-[34.0rem] rounded-xl px-3 py-2
-                    after:content-[''] after:absolute after:bottom-[-1.6rem] after:left-1/2 after:-translate-x-1/2
+                    after:content-[''] after:absolute after:bottom-[-1.5rem] after:left-1/2 after:-translate-x-1/2
                     after:border-8 after:border-transparent after:border-t-white/70"
                 >
                     <div class="always-visible-tooltip text-[#101828] text-center font-poppins text-[1.2rem] font-medium leading-[1.8rem]" >

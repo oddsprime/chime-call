@@ -36,7 +36,7 @@
       data-call-settings-panel
       ref="panel"
       :class="[ 
-        'z-[99999] flex-col absolute bottom-0 lg:top-0 right-0 h-screen md:h-auto lg:h-full mobile-landscape:h-screen w-full lg:w-40 lg:relative lg:flex  bg-black/50 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-0 md:rounded-[0.625rem] backdrop-blur-[25px] lg:backdrop-blur-none overflow-y-auto transition-transform duration-300 ease-in-out',
+        'z-[99999] flex-col absolute bottom-0 lg:top-0 right-0 h-screen md:h-auto lg:h-full mobile-landscape:h-screen w-full lg:w-40 lg:relative lg:flex  bg-black/50 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-0 md:rounded-[0.625rem] lg:!rounded-[0.625rem] backdrop-blur-[25px] lg:backdrop-blur-none overflow-y-auto transition-transform duration-300 ease-in-out',
         showSettings ? 'translate-x-0 flex mobile-landscape:w-full mobile-landscape:top-0 mobile-landscape:bottom-auto' : 'translate-x-full hidden',
         'lg:translate-x-0'
       ]"

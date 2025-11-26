@@ -15,12 +15,12 @@
       }
     },
     template: `
-      <div class="flex flex-col border-t border-[#475467] gap-2 md:!gap-0">
+      <div class="flex flex-col border-t border-[#475467] gap-4 p-4">
         <!-- Accordion Header -->
         <header
           data-background-accordion-header
           @click="toggle"
-          class="cursor-pointer hover:bg-white/5 flex justify-between items-center p-2 md:!p-4 w-full text-left transition-colors duration-200"
+          class="cursor-pointer flex justify-between py-2 items-center  w-full text-left transition-colors duration-200"
           :aria-expanded="isOpen.toString()"
         >
           <div class="flex items-center gap-2">
@@ -40,7 +40,7 @@
           data-backgrounds-accordion-content
           :data-open="isOpen ? 'true' : 'false'"
           :class="isOpen ? 'flex flex-col gap-4' : 'hidden'"
-          class="transition-all duration-300 ease-in-out overflow-hidden px-2 md:!px-4 pb-2 md:!pb-4"
+          class="transition-all duration-300 ease-in-out overflow-hidden"
           ref="content"
         >
           <!-- Toggle button (replaces checkbox) -->
