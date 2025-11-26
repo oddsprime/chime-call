@@ -43,6 +43,10 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    .background-image-item.selected {
+      border-color: #ff69b4 !important;
+      border-width: 3px !important;
+    }
   </style>
 
   <!-- Final Template Flow is driven by the ORIGINAL Vue instance (state/substate). -->
@@ -76,7 +80,6 @@
   <script src="components/prejoin/vueComponentsBackgroundsEffects.js" defer></script>
   <script src="components/prejoin/vueComponentsSettingsPanel.js" defer></script>
   <script src="components/prejoin/vueComponentsMobileJoinButton.js" defer></script>
-  <script src="components/prejoin/CamMicTooltip.js" defer></script>
   <script src="components/vueComponentTemplateChimeCalleeConnected.js" defer></script>
 
   <!-- Bottom Panel Buttons -->
@@ -142,7 +145,6 @@
     .bg-yellow1{
         background: linear-gradient(0deg, rgba(0, 0, 0, 0.10) 0%, rgba(0, 0, 0, 0.10) 100%), linear-gradient(0deg, rgba(255, 205, 41, 0.75) -3.06%, rgba(255, 205, 41, 0.00) 117.35%);
       }
-      
 
 
     /* Reaction animations */
@@ -220,7 +222,7 @@
       <!-- Center reaction layer for emoji reactions -->
       <!-- <div id="reaction-layer" style="position: fixed; inset: 0; pointer-events: none; z-index: 3000;"></div> -->
 
-      <div
+       <div
       class="relative w-full h-screen overflow-hidden"
       :class="{
         // On desktop, show 400px panel when open
@@ -323,9 +325,9 @@
           </div>
 
           <div v-if="state==='caller:connectedJoined'">
-            <waiting-to-join></waiting-to-join>
+            <waiting-to-join :chime-call-settings="ChimeCallSettings"></waiting-to-join>
             [Caller] Connected and joined - waiting for Callee to join!
-              <bottom-controls user-initials="UN" :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
+              <bottom-controls :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
                 :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings" @end-call="onEndCall"></bottom-controls>
           </div>
 
@@ -345,8 +347,9 @@
             <!-- [Caller] 🔌 The call has ended. -->
              <span>Terminated</span>
              <call-ended 
-             :substate="substate" 
-             :state="state"
+               :substate="substate" 
+               :state="state"
+               :chime-call-settings="ChimeCallSettings"
              ></call-ended>
           </div>
 
@@ -420,7 +423,11 @@
           <div v-if="state==='callee:terminated'" class="relative w-full h-screen bg-[rgba(12,17,29,0.10)] backdrop-blur-[5px] flex flex-col items-center justify-center">
             <!-- [Callee] 🔌 The call has ended. -->
             <span>Terminated</span>
-            <call-ended :substate="substate" :state="state"></call-ended>
+            <call-ended 
+              :substate="substate" 
+              :state="state"
+              :chime-call-settings="ChimeCallSettings"
+            ></call-ended>
           </div>
 
 
@@ -463,7 +470,14 @@
                     <!-- Main Video Area -->
                     <div class="flex-1 relative rounded-card-xs bg-cover bg-center">
                       <!-- Call Waiting --->
-                      <call-waiting v-if="isWaiting" user-initials="UN" :waiting-handle="'@' + userName"></call-waiting>
+                      <call-waiting 
+                        v-if="isWaiting" 
+                        :user-initials="ChimeCallSettings.callSettings.currentUserSide === 'caller' 
+                          ? (ChimeCallSettings.callUserDetails.callee?.initials || 'UN')
+                          : (ChimeCallSettings.callUserDetails.caller?.initials || 'UN')" 
+                        :waiting-handle="ChimeCallSettings.callSettings.currentUserSide === 'caller' 
+                          ? '@' + (ChimeCallSettings.callUserDetails.callee?.username || 'User')
+                          : '@' + (ChimeCallSettings.callUserDetails.caller?.username || 'User')"></call-waiting>
                       <!-- /Call Waiting --->
 
                       <!-- Main call Video -->
@@ -475,7 +489,12 @@
                     <!-- <remote-participant></remote-participant> -->
 
                     <!-- Mobile header -->
-                    <mobile-header meeting-time="November 5, 2025" user-name="jennyben" mode-text="Meeting with"
+                    <mobile-header 
+                      meeting-time="November 5, 2025" 
+                      :user-name="ChimeCallSettings.callSettings.currentUserSide === 'caller' 
+                        ? '@' + (ChimeCallSettings.callUserDetails.callee?.username || 'User')
+                        : '@' + (ChimeCallSettings.callUserDetails.caller?.username || 'User')" 
+                      :mode-text="ChimeCallSettings.callSettings.mediaType === 'video' ? 'Video Call' : ChimeCallSettings.callSettings.mediaType === 'audio' ? 'Audio Call' : 'Call'"
                       status-text="in 5 min"></mobile-header>
 
                     <div class="flex h-full absolute left-0 right-0">
@@ -506,6 +525,51 @@
 
     
 
+    <!-- Video Effects Controls -->
+    <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9; position: relative;">
+      <h3 style="margin-bottom: 15px;">Video Effects</h3>
+      
+      <!-- Blur Checkbox -->
+      <div style="margin-bottom: 20px;">
+        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+          <input 
+            type="checkbox" 
+            :checked="ChimeCallSettings.callSettings.blurEnabled"
+            @change="handleBlurCheckboxChange"
+            style="width: 18px; height: 18px; cursor: pointer;"
+          />
+          <span style="font-weight: 500;">Apply Background Blur</span>
+        </label>
+      </div>
+      
+      <!-- Background Image Grid -->
+      <div style="margin-bottom: 20px;">
+        <p style="font-weight: 500; margin-bottom: 10px;">Virtual Background</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+          <div
+            v-for="(bg, index) in backgroundImages"
+            :key="index"
+            @click="handleBackgroundImageClick(index, bg.url)"
+            :class="['background-image-item', { 'selected': ChimeCallSettings.callSettings.backgroundImageUrl === bg.url }]"
+            style="border: 2px solid #ccc; border-radius: 8px; overflow: hidden; cursor: pointer; aspect-ratio: 4/3;"
+          >
+            <img :src="bg.url" :alt="bg.name" style="width: 100%; height: 100%; object-fit: cover;" />
+          </div>
+        </div>
+      </div>
+      
+      <!-- Device Selector -->
+      <div class="status-section" data-cam-mic-element="device-select" style="margin-top: 20px;">
+        <label>Camera:</label>
+        <select data-cam-mic-element="video-select" data-camera-select></select>
+        <span data-cam-mic-element="selected-camera-label" style="font-size: 0.85em; color: #6c757d;"></span>
+        <label style="margin-left: 10px;">Mic:</label>
+        <select data-cam-mic-element="audio-select" data-microphone-select></select>
+        <span data-cam-mic-element="selected-microphone-label" style="font-size: 0.85em; color: #6c757d;"></span>
+      </div>
+      
+      <p style="color: #666; font-style: italic; margin-top: 15px;">Harwinder integrate this into the call settings</p>
+    </div>
 
     <table>
       <tr>
@@ -816,9 +880,7 @@
             <label>Blur:</label>
             <select id="blurLevelSelect">
               <option value="off">Off</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
+              <option value="low">On</option>
             </select>
             <label>Background:</label>
             <select id="backgroundSelect">
@@ -1614,7 +1676,11 @@
                   mediaType: null, // "audio" or "video"
                   currentUserRole: null, // "host", "attendee", "collaborator"
                   currentUserSide: null, // "caller" or "callee"
-                  isInGrace: false
+                  isInGrace: false,
+                  blurEnabled: false,        // Blur on/off
+                  backgroundImageUrl: null,   // Background image URL
+                  selectedVideoDevice: null,  // Selected video device ID
+                  selectedAudioDevice: null   // Selected audio device ID
                 }),
                 // Chat settings - reactive
                 chatSettings: Vue.reactive({
@@ -1628,24 +1694,18 @@
               window.settings = ChimeCallSettings;
               
               // Sync callUserDetails from callData (one-time, immutable after set)
-              // Current user avatar is always static guy.png
-              const staticCurrentUserAvatar = './guy.png';
-              
               if (window.callData || window.mockCallData) {
                 const data = window.callData || window.mockCallData;
                 // Determine caller and callee based on currentUserSide
                 if (data.currentUserSide === 'caller') {
-                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
-                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.caller = data.currentUser ? Vue.reactive({ ...data.currentUser }) : null;
                   ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
                 } else if (data.currentUserSide === 'callee') {
                   ChimeCallSettings.callUserDetails.caller = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
-                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
-                  ChimeCallSettings.callUserDetails.callee = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.callee = data.currentUser ? Vue.reactive({ ...data.currentUser }) : null;
                 } else {
                   // Fallback: if side not set, assume currentUser is caller
-                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
-                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.caller = data.currentUser ? Vue.reactive({ ...data.currentUser }) : null;
                   ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
                 }
                 
@@ -1667,6 +1727,10 @@
                 document.dispatchEvent(new CustomEvent(newState ? 'debugControls:camOn' : 'debugControls:camOff'));
                 
                 console.log(`[Vue] Camera toggled â†' ${newState ? 'ON' : 'OFF'}, current state: ${state.value}`);
+                
+                // Note: Blur/background are NOT applied here when camera turns on
+                // They are applied by the event listeners (app:background:blur, app:background:image)
+                // only when camera is already ON. This prevents triggering state changes.
                 
                 // If turning ON and in caller:callWaiting or caller:callAccepted, use CamMic with proper state management
                 if (newState && (state.value === 'caller:callWaiting' || state.value === 'caller:callAccepted')) {
@@ -2048,23 +2112,21 @@
                 
                 // Sync call settings
                 if (data.callType) ChimeCallSettings.callSettings.callType = data.callType;
-                if (data.mediaType) ChimeCallSettings.callSettings.mediaType = data.mediaType;
+                if (data.mediaType) {
+                  ChimeCallSettings.callSettings.mediaType = data.mediaType;
+                  console.log('%c[Vue] ✅ mediaType synced:', 'background: #28a745; color: white; font-weight: bold; padding: 5px;', data.mediaType);
+                }
                 if (data.currentUserRole) ChimeCallSettings.callSettings.currentUserRole = data.currentUserRole;
                 if (data.currentUserSide) ChimeCallSettings.callSettings.currentUserSide = data.currentUserSide;
                 if (data.isInGrace !== undefined) ChimeCallSettings.callSettings.isInGrace = data.isInGrace;
                 
                 // Sync user details based on side
-                // Current user avatar is always static guy.png
-                const staticCurrentUserAvatar = './guy.png';
-                
                 if (data.currentUserSide === 'caller') {
-                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
-                  ChimeCallSettings.callUserDetails.caller = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.caller = data.currentUser ? Vue.reactive({ ...data.currentUser }) : null;
                   ChimeCallSettings.callUserDetails.callee = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
                 } else if (data.currentUserSide === 'callee') {
                   ChimeCallSettings.callUserDetails.caller = data.targetUser ? Vue.reactive({ ...data.targetUser }) : null;
-                  const currentUserData = data.currentUser ? { ...data.currentUser, avatar: staticCurrentUserAvatar } : null;
-                  ChimeCallSettings.callUserDetails.callee = currentUserData ? Vue.reactive(currentUserData) : null;
+                  ChimeCallSettings.callUserDetails.callee = data.currentUser ? Vue.reactive({ ...data.currentUser }) : null;
                 }
                 
                 console.log('%c[Vue] Mock data synced to Vue call settings', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
@@ -2080,6 +2142,10 @@
                 ChimeCallSettings.callSettings.currentUserRole = null;
                 ChimeCallSettings.callSettings.currentUserSide = null;
                 ChimeCallSettings.callSettings.isInGrace = false;
+                ChimeCallSettings.callSettings.blurEnabled = false;
+                ChimeCallSettings.callSettings.backgroundImageUrl = null;
+                ChimeCallSettings.callSettings.selectedVideoDevice = null;
+                ChimeCallSettings.callSettings.selectedAudioDevice = null;
                 
                 // Reset cam/mic status (prevent inheritance from previous call)
                 ChimeCallSettings.callCamStatus = false;
@@ -2106,6 +2172,51 @@
                 console.log('%c[Vue] Call settings reset complete (including cam/mic, chat, user details, and state)', 'background: #28a745; color: white; font-weight: bold; padding: 5px;');
               }
 
+              // Background images data
+              const backgroundImages = [
+                { name: 'Red', url: './red.jpg' },
+                { name: 'Blue', url: './blue.png' }
+              ];
+              
+              // Handle blur checkbox change
+              const handleBlurCheckboxChange = (event) => {
+                const enabled = event.target.checked;
+                ChimeCallSettings.callSettings.blurEnabled = enabled;
+                
+                console.log('[Vue] Blur checkbox changed:', enabled);
+                
+                // Dispatch event
+                document.dispatchEvent(new CustomEvent('app:background:blur', {
+                  detail: {
+                    enabled: enabled,
+                    level: enabled ? 'low' : 'off',
+                    timestamp: Date.now()
+                  }
+                }));
+              };
+              
+              // Handle background image click
+              const handleBackgroundImageClick = (index, imageUrl) => {
+                // Toggle: if same image clicked, deselect it
+                if (ChimeCallSettings.callSettings.backgroundImageUrl === imageUrl) {
+                  ChimeCallSettings.callSettings.backgroundImageUrl = null;
+                  imageUrl = null;
+                } else {
+                  ChimeCallSettings.callSettings.backgroundImageUrl = imageUrl;
+                }
+                
+                console.log('[Vue] Background image clicked:', imageUrl || 'none');
+                
+                // Dispatch event
+                document.dispatchEvent(new CustomEvent('app:background:image', {
+                  detail: {
+                    imageUrl: imageUrl,
+                    type: 'virtual-background',
+                    timestamp: Date.now()
+                  }
+                }));
+              };
+
               return {
                 state,
                 substate,
@@ -2125,6 +2236,9 @@
                 onDeclineCall,
                 resetCallSettings,
                 syncMockDataToVueSettings,
+                backgroundImages,
+                handleBlurCheckboxChange,
+                handleBackgroundImageClick,
               };
             },
           });
@@ -2165,8 +2279,6 @@
           if (typeof registerCallMissed=== 'function') registerCallMissed(app);
           if (typeof registerWaitingToJoin=== 'function') registerWaitingToJoin(app);
           if (typeof registerDefaultAvatar === "function") { registerDefaultAvatar(app);}
-          if (typeof registerCamMicTooltip === "function") { registerCamMicTooltip(app);}
-          
           
 
           // Mount Vue app to #app
@@ -2252,44 +2364,100 @@
       });
 
     // Video Effects: Blur Level
-    document.getElementById("blurLevelSelect")?.addEventListener("change", (e) => {
-      const level = e.target.value;
-      console.log("[Demo] Blur level changed to:", level);
-      if (typeof DebugLogger !== "undefined") {
-        DebugLogger.system(`Blur level changed to: ${level}`);
-      }
-      if (typeof coreChime !== "undefined") {
-        coreChime.setVideoBlur(level).catch((err) => {
-          console.error("[Demo] Failed to set blur:", err);
-        });
-      }
-    });
+    const blurSelect = document.getElementById("blurLevelSelect");
+    if (blurSelect) {
+      console.log("[VideoEffects] ✅ Element blurLevelSelect found, attaching listener");
+      blurSelect.addEventListener("change", (e) => {
+        console.log("[VideoEffects] 🔔 Change event fired!");
+        const level = e.target.value;
+        console.log("[Demo] Blur level changed to:", level);
+        
+        // Update Vue settings
+        if (window.vueApp && window.vueApp.ChimeCallSettings) {
+          window.vueApp.ChimeCallSettings.callSettings.blurEnabled = (level !== 'off');
+        }
+        
+        if (typeof DebugLogger !== "undefined" && DebugLogger.addLog) {
+          DebugLogger.addLog("connected", "NOTICE", "VideoEffects", `Blur level changed to: ${level}`);
+        }
+        
+        // Only apply blur if in a Chime call (has _audioVideo)
+        if (typeof coreChime !== "undefined" && coreChime._audioVideo) {
+          const blurLevel = (level !== 'off') ? 'low' : 'off';
+          coreChime.setVideoBlur(blurLevel).catch((err) => {
+            console.error("[Demo] Failed to set blur:", err);
+          });
+        } else {
+          console.log("[VideoEffects] ⚠️ Not in Chime call yet - blur will be applied when video starts");
+        }
+      });
+      console.log("[VideoEffects] ✅ Listener attached successfully to blurLevelSelect");
+    } else {
+      console.error("[VideoEffects] ❌ Element blurLevelSelect NOT FOUND in DOM");
+    }
 
     // Video Effects: Background Image
-    document.getElementById("backgroundSelect")?.addEventListener("change", (e) => {
-      const imageUrl = e.target.value;
-      console.log("[Demo] Background changed to:", imageUrl || "None");
-      if (typeof DebugLogger !== "undefined") {
-        DebugLogger.system(`Background changed to: ${imageUrl || 'none'}`);
-      }
-      if (typeof coreChime !== "undefined") {
-        coreChime.setBackgroundImage(imageUrl || null).catch((err) => {
-          console.error("[Demo] Failed to set background:", err);
-        });
-      }
-    });
+    const backgroundSelect = document.getElementById("backgroundSelect");
+    if (backgroundSelect) {
+      console.log("[VideoEffects] ✅ Element backgroundSelect found, attaching listener");
+      backgroundSelect.addEventListener("change", (e) => {
+        console.log("[VideoEffects] 🔔 Change event fired!");
+        const imageUrl = e.target.value;
+        console.log("[Demo] Background changed to:", imageUrl || "None");
+        
+        // Update Vue settings
+        if (window.vueApp && window.vueApp.ChimeCallSettings) {
+          window.vueApp.ChimeCallSettings.callSettings.backgroundImageUrl = imageUrl || null;
+        }
+        
+        if (typeof DebugLogger !== "undefined" && DebugLogger.addLog) {
+          DebugLogger.addLog("connected", "NOTICE", "VideoEffects", `Background changed to: ${imageUrl || 'none'}`);
+        }
+        
+        // Only apply background if in a Chime call
+        if (typeof coreChime !== "undefined" && coreChime._audioVideo) {
+          coreChime.setBackgroundImage(imageUrl || null).catch((err) => {
+            console.error("[Demo] Failed to set background:", err);
+          });
+        } else {
+          console.log("[VideoEffects] ⚠️ Not in Chime call yet - background will be applied when video starts");
+        }
+      });
+      console.log("[VideoEffects] ✅ Listener attached successfully to backgroundSelect");
+    } else {
+      console.error("[VideoEffects] ❌ Element backgroundSelect NOT FOUND in DOM");
+    }
 
     // Event listener for app:background:blur (from settings checkbox)
     document.addEventListener("app:background:blur", (e) => {
-      const { enabled, level } = e.detail || {};
-      console.log("[Demo] app:background:blur event received:", { enabled, level });
-      if (typeof DebugLogger !== "undefined") {
-        DebugLogger.system(`Blur checkbox changed: ${enabled ? 'ON' : 'OFF'} (level: ${level})`);
+      const { enabled } = e.detail || {};
+      console.log("[Demo] app:background:blur event received:", { enabled });
+      
+      // Update Vue settings ONLY - do not trigger any state changes
+      if (window.vueApp && window.vueApp.ChimeCallSettings) {
+        window.vueApp.ChimeCallSettings.callSettings.blurEnabled = enabled;
+        console.log("[VideoEffects] ✅ Vue settings updated - blur stored");
       }
-      if (typeof coreChime !== "undefined") {
-        const blurLevel = enabled ? level : 'off';
+      
+      if (typeof DebugLogger !== "undefined" && DebugLogger.addLog) {
+        DebugLogger.addLog("connected", "NOTICE", "VideoEffects", `Blur checkbox changed: ${enabled ? 'ON' : 'OFF'}`);
+      }
+      
+      // Only apply if video is already ON (camera is on)
+      // This prevents applying effects when camera is off (which would trigger state changes)
+      const isVideoOn = window.vueApp && window.vueApp.ChimeCallSettings && window.vueApp.ChimeCallSettings.callCamStatus;
+      
+      if (typeof coreChime !== "undefined" && coreChime._audioVideo && isVideoOn) {
+        console.log("[VideoEffects] Applying blur - camera is ON");
+        const blurLevel = enabled ? 'low' : 'off';
         coreChime.setVideoBlur(blurLevel).catch((err) => {
           console.error("[Demo] Failed to set blur:", err);
+        });
+      } else {
+        console.log("[VideoEffects] ⚠️ Blur stored in settings - will be applied when camera turns on", {
+          hasCoreChime: typeof coreChime !== "undefined",
+          hasAudioVideo: typeof coreChime !== "undefined" && coreChime._audioVideo,
+          isVideoOn
         });
       }
     });
@@ -2298,12 +2466,31 @@
     document.addEventListener("app:background:image", (e) => {
       const { imageUrl, type } = e.detail || {};
       console.log("[Demo] app:background:image event received:", { imageUrl, type });
-      if (typeof DebugLogger !== "undefined") {
-        DebugLogger.system(`Virtual background changed: ${imageUrl || 'none'}`);
+      
+      // Update Vue settings ONLY - do not trigger any state changes
+      if (window.vueApp && window.vueApp.ChimeCallSettings) {
+        window.vueApp.ChimeCallSettings.callSettings.backgroundImageUrl = imageUrl || null;
+        console.log("[VideoEffects] ✅ Vue settings updated - background image stored");
       }
-      if (typeof coreChime !== "undefined") {
+      
+      if (typeof DebugLogger !== "undefined" && DebugLogger.addLog) {
+        DebugLogger.addLog("connected", "NOTICE", "VideoEffects", `Virtual background changed: ${imageUrl || 'none'}`);
+      }
+      
+      // Only apply if video is already ON (camera is on)
+      // This prevents applying effects when camera is off (which would trigger state changes)
+      const isVideoOn = window.vueApp && window.vueApp.ChimeCallSettings && window.vueApp.ChimeCallSettings.callCamStatus;
+      
+      if (typeof coreChime !== "undefined" && coreChime._audioVideo && isVideoOn) {
+        console.log("[VideoEffects] Applying background image - camera is ON");
         coreChime.setBackgroundImage(imageUrl || null).catch((err) => {
           console.error("[Demo] Failed to set background:", err);
+        });
+      } else {
+        console.log("[VideoEffects] ⚠️ Background image stored in settings - will be applied when camera turns on", {
+          hasCoreChime: typeof coreChime !== "undefined",
+          hasAudioVideo: typeof coreChime !== "undefined" && coreChime._audioVideo,
+          isVideoOn
         });
       }
     });
@@ -2730,7 +2917,7 @@ CallHandler.dipatchUI("caller:startCall");
           }
       
           // base & helper functions (keeps existing "video-card" or "hidden")
-          const BASE_TILE    = "tile flex items-center justify-center bg-slate-900 text-white";
+          const BASE_TILE    = "tile flex items-center justify-center rounded-xl border-slate-300 bg-slate-900 text-white";
           const MINI_OVERLAY = "absolute bottom-[10rem] right-4 w-[25rem] h-[15rem] z-50 rounded-xl overflow-hidden";
           const FULL_VIEW    = "absolute inset-0 w-auto h-auto rounded-xl";
       

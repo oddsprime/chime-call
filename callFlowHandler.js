@@ -2547,12 +2547,13 @@ static dipatchUI(state, substate = "none", payload = {}) {
     // Clear all call-related state (database IDs, meeting info, etc.)
     CallHandler.clearAllCallState();
     
-    // Reset Vue call settings (including cam/mic)
-    if (window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
-      window.vueApp.resetCallSettings();
-    }
+    // DON'T reset Vue call settings here - keep data for terminated screen
+    // Settings will be reset when starting a NEW call instead
+    // if (window.vueApp && typeof window.vueApp.resetCallSettings === 'function') {
+    //   window.vueApp.resetCallSettings();
+    // }
     
-    // Reset mockCallData on terminate
+    // Reset mockCallData on terminate (but keep user details for terminated screen display)
     if (window.mockCallData) {
       console.log('[CallHandler] Resetting mockCallData on terminate');
       window.mockCallData.callType = null;
@@ -2755,6 +2756,9 @@ static dipatchUI(state, substate = "none", payload = {}) {
     const calleeId = d.calleeId;
     const callerRole = d.role;
     const callType = d.callType;
+    const mediaType = d.mediaType || 'video'; // Default to video if not specified
+    
+    console.log("[CallHandler] app:call:start parameters:", { callerId, calleeId, callerRole, callType, mediaType });
 
     if (callType !== CallHandler.TYPE_INSTANT) {
       console.log("[CallHandler] non-instant app start");
@@ -2797,17 +2801,32 @@ static dipatchUI(state, substate = "none", payload = {}) {
       return;
     }
 
+    // Populate mockCallData BEFORE dispatching events
+    if (window.mockCallData) {
+      console.log("[CallHandler] Populating mockCallData with mediaType:", mediaType);
+      window.mockCallData.callType = callType;
+      window.mockCallData.mediaType = mediaType;
+      window.mockCallData.currentUserRole = callerRole;
+      window.mockCallData.currentUserSide = "caller";
+      
+      // Sync mockCallData to Vue call settings
+      if (window.vueApp && typeof window.vueApp.syncMockDataToVueSettings === 'function') {
+        console.log("[CallHandler] Syncing mockCallData to Vue settings");
+        window.vueApp.syncMockDataToVueSettings();
+      }
+    }
+
     console.log("[CallHandler] dispatch call:initiate");
     document.dispatchEvent(
       new CustomEvent(CallHandler.FLAGS.CALL_INITIATE, {
-        detail: { callerId, calleeId, type: callType, role: callerRole },
+        detail: { callerId, calleeId, type: callType, role: callerRole, mediaType },
       })
     );
 
-    console.log("[CallHandler] socket CALL_INITIATE");
+    console.log("[CallHandler] socket CALL_INITIATE with mediaType:", mediaType);
     SocketHandler.sendSocketMessage({
       flag: CallHandler.FLAGS.CALL_INITIATE,
-      payload: { to: calleeId, callType, callerId, calleeId, role: callerRole },
+      payload: { to: calleeId, callType, callerId, calleeId, role: callerRole, mediaType },
       schema: CallHandler.SCHEMA.initiate,
     });
 

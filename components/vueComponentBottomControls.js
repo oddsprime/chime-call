@@ -20,10 +20,58 @@
             : 'w-full';
           return `${widthClass} ${bg} ${base}`;
         },
+        // Get other user's data (caller sees callee, callee sees caller)
+        otherUserInitials() {
+          const currentSide = this.chimeCallSettings?.callSettings?.currentUserSide;
+          if (currentSide === 'caller') {
+            return this.chimeCallSettings?.callUserDetails?.callee?.initials || 'UN';
+          } else if (currentSide === 'callee') {
+            return this.chimeCallSettings?.callUserDetails?.caller?.initials || 'UN';
+          }
+          return this.chimeCallSettings?.callUserDetails?.callee?.initials || 
+                 this.chimeCallSettings?.callUserDetails?.caller?.initials || 'UN';
+        },
+        otherUserAvatar() {
+          const currentSide = this.chimeCallSettings?.callSettings?.currentUserSide;
+          if (currentSide === 'caller') {
+            return this.chimeCallSettings?.callUserDetails?.callee?.avatar || '';
+          } else if (currentSide === 'callee') {
+            return this.chimeCallSettings?.callUserDetails?.caller?.avatar || '';
+          }
+          return this.chimeCallSettings?.callUserDetails?.callee?.avatar || 
+                 this.chimeCallSettings?.callUserDetails?.caller?.avatar || '';
+        },
+        otherUserUsername() {
+          const currentSide = this.chimeCallSettings?.callSettings?.currentUserSide;
+          let username = '';
+          if (currentSide === 'caller') {
+            username = this.chimeCallSettings?.callUserDetails?.callee?.username || '';
+          } else if (currentSide === 'callee') {
+            username = this.chimeCallSettings?.callUserDetails?.caller?.username || '';
+          } else {
+            username = this.chimeCallSettings?.callUserDetails?.callee?.username || 
+                       this.chimeCallSettings?.callUserDetails?.caller?.username || '';
+          }
+          return username ? `@${username}` : '';
+        },
+        callModeText() {
+          const mediaType = this.chimeCallSettings?.callSettings?.mediaType;
+          if (mediaType === 'video') {
+            return 'Video Call';
+          } else if (mediaType === 'audio') {
+            return 'Audio Call';
+          }
+          return 'Call';
+        },
       },
       template: `
         <div :class="containerClass">
-          <bottom-left-info :user-initials="userInitials" />
+           <bottom-left-info 
+            :user-initials="otherUserInitials" 
+            :avatar-src="otherUserAvatar"
+            :user-name="otherUserUsername"
+            :mode-text="callModeText"
+          />
           <div class="flex justify-center items-center gap-4 flex-none lg:flex-1 lg:w-1/3">
             <bottom-center-controls
               :toggle-camera="toggleCamera"

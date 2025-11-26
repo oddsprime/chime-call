@@ -25,13 +25,9 @@
             type: String,
             default: ''
           },
-          callerId: {
-            type: String,
-            default: ''
-          },
-          calleeId: {
-            type: String,
-            default: ''
+          chimeCallSettings: {
+            type: Object,
+            default: null
           }
         },
         computed: {
@@ -39,6 +35,51 @@
             const isCaller = this.state === 'caller:terminated';
             const isCallee = this.state === 'callee:terminated';
             const substate = this.substate || '';
+            
+            // Get username - try multiple sources
+            let usernameValue = '';
+            
+            // 1. Try from prop first
+            if (this.chimeCallSettings && this.chimeCallSettings.callUserDetails) {
+              if (isCaller) {
+                usernameValue = this.chimeCallSettings.callUserDetails.callee?.username || '';
+              } else if (isCallee) {
+                usernameValue = this.chimeCallSettings.callUserDetails.caller?.username || '';
+              }
+            }
+            
+            // 2. Fallback to window.settings
+            if (!usernameValue && typeof window !== 'undefined' && window.settings && window.settings.callUserDetails) {
+              if (isCaller) {
+                usernameValue = window.settings.callUserDetails.callee?.username || '';
+              } else if (isCallee) {
+                usernameValue = window.settings.callUserDetails.caller?.username || '';
+              }
+            }
+            
+            // 3. Fallback to window.mockCallData
+            if (!usernameValue && typeof window !== 'undefined' && window.mockCallData) {
+              if (isCaller) {
+                usernameValue = window.mockCallData.targetUser?.username || '';
+              } else if (isCallee) {
+                usernameValue = window.mockCallData.targetUser?.username || '';
+              }
+            }
+            
+            // Format username with @ symbol, or use fallback
+            const username = usernameValue ? `@${usernameValue}` : '@Username';
+            
+            console.log('[CallEnded] USERNAME RESOLUTION:', {
+              state: this.state,
+              substate,
+              isCaller,
+              isCallee,
+              usernameValue,
+              finalUsername: username,
+              'prop.callUserDetails': this.chimeCallSettings?.callUserDetails,
+              'window.settings.callUserDetails': window.settings?.callUserDetails,
+              'window.mockCallData': window.mockCallData
+            });
             
             // 1. No Answer (timeout)
             if (substate === 'No Answer') {
@@ -55,7 +96,7 @@
               if (isCaller || isCallee) {
                 return 'You have ended the call';
               } else {
-                return '<span>@Username</span> is in a call, try again later';
+                return `<span>${username}</span> is in a call, try again later`;
               }
             }
             
@@ -64,7 +105,7 @@
               if (isCaller || isCallee) {
                 return 'You have ended the call';
               } else {
-                return '<span>@Username</span> is busy';
+                return `<span>${username}</span> is busy`;
               }
             }
             
@@ -75,7 +116,7 @@
             
             // 6. Caller sees callee declined (caller receives declined from callee)
             if (isCaller && substate === 'declined') {
-              return '<span>@Username</span> has declined the call';
+              return `<span>${username}</span> has declined the call`;
             }
             
             // 7. Caller cancelled before callee answered (caller in callWaiting state)
@@ -85,12 +126,12 @@
             
             // 8. Callee sees caller cancelled (callee receives cancelled from caller before answer)
             if (isCallee && substate === 'cancelled') {
-              return '<span>@Username</span> has ended the call';
+              return `<span>${username}</span> cancelled the call`;
             }
             
             // 9. Other user ended the call (cancelled after answer)
             if (substate === 'cancelled') {
-              return '<span>@Username</span> has ended the call';
+              return `<span>${username}</span> has ended the call`;
             }
             
             // Default fallback

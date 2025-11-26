@@ -14,6 +14,28 @@
       chimeCallSettings: { type: Object, required: false },
     },
     emits: ['end-call'],
+     computed: {
+      callerInitials() {
+        return this.chimeCallSettings?.callUserDetails?.caller?.initials || 'UN';
+      },
+      callerAvatar() {
+        return this.chimeCallSettings?.callUserDetails?.caller?.avatar || '';
+      },
+      callerUsername() {
+        return this.chimeCallSettings?.callUserDetails?.caller?.username 
+          ? `@${this.chimeCallSettings.callUserDetails.caller.username}` 
+          : '';
+      },
+      callModeText() {
+        const mediaType = this.chimeCallSettings?.callSettings?.mediaType;
+        if (mediaType === 'video') {
+          return 'Video Call';
+        } else if (mediaType === 'audio') {
+          return 'Audio Call';
+        }
+        return 'Call';
+      },
+    },
     components: (function () {
       const comps = {};
       const vc = window.VueComponents || {};
@@ -124,10 +146,18 @@
                   <connecting-section :show="substate === 'connecting'"></connecting-section>
                 </div>
               </div>
-              <prejoin-mobile-header></prejoin-mobile-header>
+              <prejoin-mobile-header 
+                :mode-text="callModeText"
+                :user-name="callerUsername"
+              ></prejoin-mobile-header>
               <back-button :show="substate !== 'connecting'"></back-button>
               <div class="flex flex-col lg:flex-row z-10 gap-2 justify-between left-0 right-0 lg:rounded-none rounded-full items-center lg:relative absolute bottom-4 lg:bottom-0 lg:w-full w-full lg:mx-0 px-4 md:!px-0 py-0">
-                <bottom-left-info :user-initials="userInitials" />
+                <bottom-left-info 
+                  :user-initials="callerInitials" 
+                  :avatar-src="callerAvatar"
+                  :user-name="callerUsername"
+                  :mode-text="callModeText"
+                />
                 <div class="flex items-center justify-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
                   
                 <div v-if="chimeCallSettings && !chimeCallSettings.callCamStatus" class="tooltip-wrapper bg-white/70 flex justify-center absolute top-[-70px] w-[34.0rem] rounded-xl px-3 py-2

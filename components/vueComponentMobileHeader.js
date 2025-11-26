@@ -4,8 +4,8 @@
     app.component("mobile-header", {
       props: {
         meetingTime: { type: String, default: "November 5, 2025" },
-        userName: { type: String, default: "User" },
-        modeText: { type: String, default: "Call with" },
+        userName: { type: String, default: "@User" },
+        modeText: { type: String, default: "Call" },
         statusText: { type: String, default: "in 5 min" },
       },
       template: `

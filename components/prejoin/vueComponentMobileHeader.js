@@ -7,10 +7,14 @@
 
     const PrejoinMobileHeader = defineComponent({
         name: 'PrejoinMobileHeader',
+        props: {
+          modeText: { type: String, default: '' },
+          userName: { type: String, default: '' },
+        },
         template: `
         <div class="flex w-full top-2 absolute z-30 lg:hidden flex-col"><span
                 class="text-white text-center text-sm font-medium block lg:hidden" data-call-type-text="">
-                [[mode_text]] [[userName]] </span>
+                {{ modeText }} {{ userName }} </span>
               <div class="flex justify-center gap-2"><span class="text-white text-xs font-medium"
                   data-meeting-time="">November 5, 2025</span>
                 <div class=" p-1 font-medium text-gray-700 hidden" style="display: none;">Timer: <span

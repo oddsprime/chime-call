@@ -401,6 +401,28 @@ class coreChime {
           else {
             console.warn("[coreChime] No video input method available");
           }
+          
+          // Apply blur/background from settings if any (before tile starts)
+          console.log("[coreChime] Checking for video effects in settings (during join)...");
+          if (window.vueApp && window.vueApp.ChimeCallSettings) {
+            const settings = window.vueApp.ChimeCallSettings.callSettings;
+            
+            // Apply blur if enabled
+            if (settings.blurEnabled) {
+              console.log("[coreChime] ✅ Applying blur from settings (during join)");
+              await this.setVideoBlur('on');
+            }
+            
+            // Apply background image if set
+            if (settings.backgroundImageUrl) {
+              console.log("[coreChime] ✅ Applying background image from settings (during join):", settings.backgroundImageUrl);
+              await this.setBackgroundImage(settings.backgroundImageUrl);
+            }
+            
+            if (!settings.blurEnabled && !settings.backgroundImageUrl) {
+              console.log("[coreChime] No video effects in settings (during join)");
+            }
+          }
         } catch (e) {
           console.warn("[coreChime] Video input setup failed:", e);
         }
@@ -611,8 +633,19 @@ class coreChime {
           console.log("[coreChime] Preferred camera from CamMic:", preferredCam);
           console.log("[coreChime] Using camera:", selectedCam);
 
+          // Check for video effects in settings BEFORE starting video
+          console.log("[coreChime] 1/6 Checking for video effects in settings...");
+          let hasBlur = false;
+          let hasBackground = false;
+          if (window.vueApp && window.vueApp.ChimeCallSettings) {
+            const settings = window.vueApp.ChimeCallSettings.callSettings;
+            hasBlur = settings.blurEnabled || false;
+            hasBackground = settings.backgroundImageUrl ? true : false;
+            console.log("[coreChime] Video effects check:", { hasBlur, hasBackground, backgroundUrl: settings.backgroundImageUrl });
+          }
+
           // Set video input device (try both API versions)
-          console.log("[coreChime] 1/3 Setting video input device...");
+          console.log("[coreChime] 2/6 Setting video input device...");
           try {
           if (typeof this._audioVideo.chooseVideoInputDevice === "function") {
             await this._audioVideo.chooseVideoInputDevice(selectedCam);
@@ -627,12 +660,32 @@ class coreChime {
           }
 
           // Longer delay to ensure device is ready and stream starts
-          console.log("[coreChime] 2/3 Waiting for camera to acquire stream...");
+          console.log("[coreChime] 3/6 Waiting for camera to acquire stream...");
           await new Promise(resolve => setTimeout(resolve, 500));
+
+          // Apply blur/background BEFORE starting the video tile (prevents flash of raw video)
+          if (hasBlur || hasBackground) {
+            console.log("[coreChime] 4/6 Applying video effects BEFORE tile starts...");
+            const settings = window.vueApp.ChimeCallSettings.callSettings;
+            
+            // Apply blur if enabled
+            if (hasBlur) {
+              console.log("[coreChime] ✅ Applying blur from settings (before tile start)");
+              await this.setVideoBlur('on');
+            }
+            
+            // Apply background image if set
+            if (hasBackground && settings.backgroundImageUrl) {
+              console.log("[coreChime] ✅ Applying background image from settings (before tile start):", settings.backgroundImageUrl);
+              await this.setBackgroundImage(settings.backgroundImageUrl);
+            }
+          } else {
+            console.log("[coreChime] 4/6 No video effects in settings - video will be clean");
+          }
 
           // ALWAYS start the local video tile when turning video ON
           // This ensures the SDK properly binds the new stream to the video element
-          console.log("[coreChime] 3/3 Starting/restarting local video tile...");
+          console.log("[coreChime] 5/6 Starting/restarting local video tile...");
           this._audioVideo.startLocalVideoTile();
           if (!this._localVideoTileStarted) {
             this._localVideoTileStarted = true;
@@ -641,12 +694,12 @@ class coreChime {
             console.log("[coreChime] ✅ Local video tile restarted (ensures stream binding)");
           }
           
-          // Wait a bit more for stream to be bound to tile
-          console.log("[coreChime] 4/4 Waiting for stream to bind to tile...");
-          await new Promise(resolve => setTimeout(resolve, 500));
+          // Wait a bit for stream to be bound to tile
+          console.log("[coreChime] 6/6 Waiting for stream to bind to tile...");
+          await new Promise(resolve => setTimeout(resolve, 300));
           
           this._videoEnabled = true;
-          console.log("[coreChime] 5/5 Video ON complete - state updated to:", this._videoEnabled);
+          console.log("[coreChime] ✅ Video ON complete - state updated to:", this._videoEnabled);
           
           // Manually emit tile update for local tile (SDK doesn't always fire this)
           const localAttendeeId = this._localIdentifiers.attendeeId;
@@ -689,28 +742,12 @@ class coreChime {
         console.log("[coreChime] ✅ Video OFF complete - camera light should turn off");
         console.log("[coreChime] ✅ Tile remains active, just no video stream");
         
-        // Manually emit tile update for local tile (SDK doesn't fire this on stopVideoInput)
+        // DON'T manually emit tile update - let SDK handle it naturally
+        // Manual emissions cause OFF→ON→OFF flickering
+        
+        // Notify remote users via data channel
         const localAttendeeId = this._localIdentifiers.attendeeId;
         if (localAttendeeId) {
-          console.log("[coreChime] 📤 Manually emitting tile update: video OFF");
-          if (typeof DebugLogger !== "undefined") {
-            DebugLogger.addLog('connected', 'NOTICE', 'coreChime.toggleVideo', "Manual Tile Update: video OFF", {
-              attendeeId: localAttendeeId,
-              hasStream: false,
-              reason: "stopVideoInput() doesn't trigger SDK observer"
-            });
-          }
-          this._emit("coreChime:tile-updated", {
-            tileId: 1, // Local tile is always 1
-            boundAttendeeId: localAttendeeId,
-            isContent: false,
-            isLocal: true,
-            active: true, // Tile is still active
-            hasStream: false, // But no video stream
-            paused: false,
-          });
-          
-          // Notify remote users via data channel
           console.log("[coreChime] 📤 Notifying remote users: video OFF");
           if (typeof DebugLogger !== "undefined") {
             DebugLogger.addLog('connected', 'NOTICE', 'coreChime.toggleVideo', "Sending video toggle to remote", {
@@ -735,20 +772,34 @@ class coreChime {
    * Changes the microphone during active call
    * ==================================================================== */
   static async changeAudioInputDevice(deviceId) {
-    console.log("[coreChime] [changeAudioInputDevice]", deviceId);
+    console.log("[coreChime] [changeAudioInputDevice] [Start]", deviceId);
     
     if (!this._audioVideo) {
-      console.warn("[coreChime] Cannot change audio device - not initialized");
+      console.warn("[coreChime] [changeAudioInputDevice] Cannot change audio device - not initialized");
       return;
     }
     
     try {
-      await this._audioVideo.chooseAudioInputDevice(deviceId);
+      // Try new API first
+      if (typeof this._audioVideo.chooseAudioInputDevice === "function") {
+        console.log("[coreChime] [changeAudioInputDevice] Using new API: chooseAudioInputDevice");
+        await this._audioVideo.chooseAudioInputDevice(deviceId);
+        console.log("[coreChime] [changeAudioInputDevice] ✅ Audio input chosen (new API):", deviceId);
+      }
+      // Fall back to old API
+      else if (typeof this._audioVideo.startAudioInput === "function") {
+        console.log("[coreChime] [changeAudioInputDevice] Using old API: startAudioInput");
+        await this._audioVideo.startAudioInput(deviceId);
+        console.log("[coreChime] [changeAudioInputDevice] ✅ Audio input started (old API):", deviceId);
+      } else {
+        throw new Error("Neither chooseAudioInputDevice nor startAudioInput methods are available");
+      }
+      
       localStorage.setItem("CamMicPreferred-microphone", deviceId);
-      console.log("[coreChime] ✅ Microphone changed to:", deviceId);
+      console.log("[coreChime] [changeAudioInputDevice] ✅ Microphone changed to:", deviceId);
       this._emit("coreChime:audio-device-changed", { deviceId });
     } catch (error) {
-      console.error("[coreChime] Failed to change audio device:", error);
+      console.error("[coreChime] [changeAudioInputDevice] Failed to change audio device:", error);
       throw error;
     }
   }
@@ -758,10 +809,10 @@ class coreChime {
    * Changes the camera during active call
    * ==================================================================== */
   static async changeVideoInputDevice(deviceId) {
-    console.log("[coreChime] [changeVideoInputDevice]", deviceId);
+    console.log("[coreChime] [changeVideoInputDevice] [Start]", deviceId);
     
     if (!this._audioVideo) {
-      console.warn("[coreChime] Cannot change video device - not initialized");
+      console.warn("[coreChime] [changeVideoInputDevice] Cannot change video device - not initialized");
       return;
     }
     
@@ -769,12 +820,26 @@ class coreChime {
       // Store current video device
       this._currentVideoDevice = deviceId;
       
-      await this._audioVideo.chooseVideoInputDevice(deviceId);
+      // Try new API first
+      if (typeof this._audioVideo.chooseVideoInputDevice === "function") {
+        console.log("[coreChime] [changeVideoInputDevice] Using new API: chooseVideoInputDevice");
+        await this._audioVideo.chooseVideoInputDevice(deviceId);
+        console.log("[coreChime] [changeVideoInputDevice] ✅ Video input chosen (new API):", deviceId);
+      }
+      // Fall back to old API
+      else if (typeof this._audioVideo.startVideoInput === "function") {
+        console.log("[coreChime] [changeVideoInputDevice] Using old API: startVideoInput");
+        await this._audioVideo.startVideoInput(deviceId);
+        console.log("[coreChime] [changeVideoInputDevice] ✅ Video input started (old API):", deviceId);
+      } else {
+        throw new Error("Neither chooseVideoInputDevice nor startVideoInput methods are available");
+      }
+      
       localStorage.setItem("CamMicPreferred-camera", deviceId);
-      console.log("[coreChime] ✅ Camera changed to:", deviceId);
+      console.log("[coreChime] [changeVideoInputDevice] ✅ Camera changed to:", deviceId);
       this._emit("coreChime:video-device-changed", { deviceId });
     } catch (error) {
-      console.error("[coreChime] Failed to change video device:", error);
+      console.error("[coreChime] [changeVideoInputDevice] Failed to change video device:", error);
       throw error;
     }
   }
@@ -807,10 +872,11 @@ class coreChime {
    * Sets background blur level for video - Using v2 SDK approach
    * ==================================================================== */
   static async setVideoBlur(level) {
-    console.log("[coreChime] [setVideoBlur]", level);
+    console.log("[coreChime] [setVideoBlur] 🔵 Called with level:", level);
     
     if (!this._audioVideo) {
-      console.warn("[coreChime] Cannot set blur - not initialized");
+      console.warn("[coreChime] ❌ Cannot set blur - _audioVideo not initialized");
+      console.log("[coreChime] Debug: _audioVideo =", this._audioVideo);
       DebugLogger.addLog(
         "connected",
         "CRITICAL",
@@ -819,30 +885,41 @@ class coreChime {
       );
       return;
     }
+    console.log("[coreChime] ✅ _audioVideo exists");
     
     try {
       // Get SDK root
       const SDK = window.ChimeSDK || window.AmazonChimeSDK || window;
       const root = SDK.default || SDK;
+      console.log("[coreChime] 🔍 SDK root:", root ? "found" : "NOT FOUND");
       
       // Get current video device using CamMic utility (has its own memory)
       const preferredCam = (typeof CamMicPermissionsUtility !== 'undefined' && CamMicPermissionsUtility.getPreferredDevice)
         ? CamMicPermissionsUtility.getPreferredDevice("camera")
         : null;
       const videoDevice = preferredCam || this._currentVideoDevice || 'default';
+      console.log("[coreChime] 🎥 Video device:", {
+        preferredCam,
+        _currentVideoDevice: this._currentVideoDevice,
+        finalDevice: videoDevice
+      });
       
       if (level === 'off') {
+        console.log("[coreChime] 🔄 Disabling blur (level = off)");
         // Just use the raw video device (original approach)
         if (videoDevice) {
+          console.log("[coreChime] 🎥 Starting raw video input:", videoDevice);
           await this._audioVideo.startVideoInput(videoDevice);
+          console.log("[coreChime] ✅ Raw video input started");
         }
         this._videoProcessor = null;
         this._videoTransformDevice = null;
         console.log("[coreChime] ✅ Blur disabled");
         DebugLogger.addLog("connected", "NOTICE", "setVideoBlur", "Blur disabled");
       } else {
+        console.log("[coreChime] 🔄 Enabling blur (level =", level + ")");
         // Check if BackgroundBlurStrength enum exists
-        console.log("[coreChime] BackgroundBlurStrength enum:", root.BackgroundBlurStrength);
+        console.log("[coreChime] 🔍 Checking BackgroundBlurStrength enum:", root.BackgroundBlurStrength);
         
         // Map blur levels - use numeric values if enum not available
         let blurStrength;
@@ -853,7 +930,7 @@ class coreChime {
             high: root.BackgroundBlurStrength.HIGH
           };
           blurStrength = strengthMap[level] || root.BackgroundBlurStrength.MEDIUM;
-          console.log(`[coreChime] Using enum blur: ${level} = ${blurStrength}`);
+          console.log(`[coreChime] ✅ Using enum blur: ${level} = ${blurStrength}`);
         } else {
           // Fallback to numeric values
           const strengthMap = {
@@ -862,46 +939,56 @@ class coreChime {
             high: 25
           };
           blurStrength = strengthMap[level] || 15;
-          console.log(`[coreChime] Using numeric blur: ${level} = ${blurStrength}`);
+          console.log(`[coreChime] ✅ Using numeric blur: ${level} = ${blurStrength}`);
         }
         
+        console.log("[coreChime] 🔍 Checking for BackgroundBlurVideoFrameProcessor...");
         if (!root.BackgroundBlurVideoFrameProcessor) {
+          console.error("[coreChime] ❌ BackgroundBlurVideoFrameProcessor NOT AVAILABLE in SDK");
           throw new Error("BackgroundBlurVideoFrameProcessor not available in SDK");
         }
+        console.log("[coreChime] ✅ BackgroundBlurVideoFrameProcessor found");
         
+        console.log("[coreChime] 🔍 Checking for DefaultVideoTransformDevice...");
         if (!root.DefaultVideoTransformDevice) {
+          console.error("[coreChime] ❌ DefaultVideoTransformDevice NOT AVAILABLE in SDK");
           throw new Error("DefaultVideoTransformDevice not available in SDK");
         }
+        console.log("[coreChime] ✅ DefaultVideoTransformDevice found");
         
         // Create blur processor
+        console.log("[coreChime] 🔄 Creating blur processor with strength:", blurStrength);
         const processor = await root.BackgroundBlurVideoFrameProcessor.create({
           blurStrength: blurStrength
         });
         
-        console.log("[coreChime] ✓ Processor created with actual blur strength:", blurStrength);
-        
-        console.log("[coreChime] ✓ Blur processor created");
+        console.log("[coreChime] ✅ Processor created with actual blur strength:", blurStrength);
+        console.log("[coreChime] ✅ Blur processor created:", processor);
         
         // Create logger
+        console.log("[coreChime] 🔄 Creating ConsoleLogger...");
         const logger = new root.ConsoleLogger('VideoFilter', root.LogLevel.INFO);
+        console.log("[coreChime] ✅ Logger created");
         
         // Create transform device
+        console.log("[coreChime] 🔄 Creating DefaultVideoTransformDevice with videoDevice:", videoDevice);
         const transformDevice = new root.DefaultVideoTransformDevice(
           logger,
           videoDevice,
           [processor]
         );
+        console.log("[coreChime] ✅ Transform device created:", transformDevice);
         
-        console.log("[coreChime] Applying transform device...");
-        
+        console.log("[coreChime] 🔄 Applying transform device to _audioVideo...");
         // Apply the transform device (SDK handles cleanup automatically)
         await this._audioVideo.startVideoInput(transformDevice);
+        console.log("[coreChime] ✅ Transform device applied successfully");
         
         // Update state
         this._videoProcessor = processor;
         this._videoTransformDevice = transformDevice;
         
-        console.log("[coreChime] ✅ Blur applied:", level);
+        console.log("[coreChime] ✅✅✅ Blur applied successfully:", level);
         DebugLogger.addLog(
           "connected",
           "NOTICE",
@@ -911,9 +998,16 @@ class coreChime {
       }
       
       localStorage.setItem("CamMicPreferred-blur", level);
+      console.log("[coreChime] 💾 Saved blur level to localStorage");
       this._emit("coreChime:blur-changed", { level });
+      console.log("[coreChime] 📢 Emitted coreChime:blur-changed event");
     } catch (error) {
-      console.error("[coreChime] Failed to set blur:", error);
+      console.error("[coreChime] ❌❌❌ Failed to set blur:", error);
+      console.error("[coreChime] Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
       DebugLogger.addLog(
         "connected",
         "CRITICAL",
