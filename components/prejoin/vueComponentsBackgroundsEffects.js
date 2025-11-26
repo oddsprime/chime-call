@@ -8,6 +8,12 @@
 
   const SettingsBackgroundsEffects = defineComponent({
     name: 'SettingsBackgroundsEffects',
+    props: {
+      chimeCallSettings: {
+        type: Object,
+        default: null
+      }
+    },
     template: `
       <div class="flex flex-col border-t border-[#475467] gap-2 md:!gap-0">
         <!-- Accordion Header -->
@@ -37,46 +43,63 @@
           class="transition-all duration-300 ease-in-out overflow-hidden px-2 md:!px-4 pb-2 md:!pb-4"
           ref="content"
         >
+          <!-- Toggle button (replaces checkbox) -->
           <div>
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                :checked="blurEnabled"
-                @change="handleBlurChange"
-                class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
-              />
+            <!-- Accessible toggle using a hidden checkbox + visual track/knob -->
+            <label
+              class="flex items-center justify-between gap-3 w-full max-w-[26.0rem] rounded-full px-3 py-2 cursor-pointer"
+              title="Toggle background blur"
+            >
+              <span class="relative inline-block w-12 h-6">
+                <!-- visually-hidden checkbox for accessibility -->
+                <input
+                  type="checkbox"
+                  class="sr-only"
+                  :checked="blurEnabled"
+                  @change="toggleBlur"
+                  aria-label="Apply Background Blur"
+                />
+                <!-- track -->
+                <span :class="['absolute inset-0 rounded-full transition-colors', blurEnabled ? 'bg-green-500' : 'bg-gray-400']"></span>
+                <span :class="['absolute top-[0.2rem] left-[0.2rem] w-5 h-5 bg-white rounded-full transition-transform', blurEnabled ? 'translate-x-6' : 'translate-x-0']"></span>
+              </span>
               <span class="text-white font-medium text-base">Apply Background Blur</span>
             </label>
-          </div>
-
-          <div>
-            <p class="text-white font-medium text-base">Virtual Background</p>
-            <div class="mt-[10px] flex flex-wrap gap-2">
-              <div
-                v-for="i in 6"
-                :key="i"
-                @click="handleBackgroundClick(i, 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/backgrounds/bg' + i + '.jpg')"
-                :class="[
-                  'h-[72px] w-[86px] border rounded-xl overflow-hidden cursor-pointer',
-                  selectedBackgroundIndex === i ? 'border-[3px] border-pink-500' : 'border border-[#FFFFFF80]'
-                ]"
-              >
-                <img
-                  :src="'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/backgrounds/bg' + i + '.jpg'"
-                  class="h-full w-full object-cover"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `,
+           </div>
+ 
+           <div>
+             <p class="text-white font-medium text-base">Virtual Background</p>
+             <div class="mt-[10px] flex flex-wrap gap-2">
+               <div
+                 v-for="(bg, index) in backgroundImages"
+                 :key="index"
+                 @click="handleBackgroundImageClick(index, bg.url)"
+                 :class="[
+                   'h-[72px] w-[86px] rounded-xl overflow-hidden cursor-pointer',
+                   chimeCallSettings?.callSettings?.backgroundImageUrl === bg.url ? 'border-[3px] border-green-400' : 'border border-[#FFFFFF80]'
+                 ]"
+               >
+                 <img
+                   :src="bg.url"
+                   :alt="bg.name"
+                   class="h-full w-full object-cover"
+                 />
+               </div>
+             </div>
+           </div>
+         </div>
+       </div>
+     `,
     setup() {
       const accordionId = 'settings-backgrounds-effects';
       const isOpen = ref(false);
       const content = ref(null);
-      const blurEnabled = ref(false); // Default OFF
-      const selectedBackgroundIndex = ref(null); // Track selected virtual background
+      const blurEnabled = ref(false);
+      const selectedBackgroundIndex = ref(null);
+      const backgroundImages = ref([
+        { name: 'Red', url: '/red.jpg' },
+        { name: 'Blue', url: '/blue.png' }
+      ]);
 
       function onAccordionOpen(e) {
         const incomingId = e?.detail;
@@ -94,31 +117,23 @@
         await nextTick();
       }
 
-      function handleBlurChange(event) {
-        const enabled = event.target.checked;
-        blurEnabled.value = enabled;
-        
-        // Dispatch event similar to call accepted flow
+      function toggleBlur() {
+        blurEnabled.value = !blurEnabled.value;
+        const enabled = blurEnabled.value;
         const blurLevel = enabled ? 'high' : 'off';
-        console.log('[SettingsBackgroundsEffects] Blur changed:', blurLevel);
-        
+        console.log('[SettingsBackgroundsEffects] Blur toggled:', blurLevel);
         document.dispatchEvent(new CustomEvent('app:background:blur', {
           detail: {
-            enabled: enabled,
+            enabled,
             level: blurLevel,
             timestamp: Date.now()
           }
         }));
       }
 
-      function handleBackgroundClick(index, imageUrl) {
-        // Remove border from previously selected
+      function handleBackgroundImageClick(index, imageUrl) {
         selectedBackgroundIndex.value = index;
-        
-        // Add pink border via class binding
         console.log('[SettingsBackgroundsEffects] Background clicked:', imageUrl);
-        
-        // Dispatch event similar to call controls
         document.dispatchEvent(new CustomEvent('app:background:image', {
           detail: {
             imageUrl: imageUrl,
@@ -141,9 +156,10 @@
         content, 
         toggle, 
         blurEnabled, 
-        handleBlurChange,
+        toggleBlur,
+        backgroundImages,
         selectedBackgroundIndex,
-        handleBackgroundClick
+        handleBackgroundImageClick
       };
     },
   });

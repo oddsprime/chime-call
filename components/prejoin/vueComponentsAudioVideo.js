@@ -37,90 +37,14 @@
           class="transition-all duration-300 ease-in-out overflow-hidden px-2 md:!px-4 pb-2 md:!pb-4"
           ref="content"
         >
-          <!-- CAMERA -->
-          <div class="flex flex-col gap-2">
-            <div class="h-6 flex items-center">
-              <h3 class="text-gray-50 text-sm font-semibold">CAMERA</h3>
-            </div>
-            <div class="relative">
-              <div data-camera-drop-dropdown-trigger=""
-                class="py-2 px-3 h-[4.4rem] flex items-center border border-[#EAECF080] rounded-[6px] bg-black/50 justify-between cursor-pointer hover:bg-black/70 transition-colors">
-                <div class="flex items-center gap-2 lg:flex-1 lg:w-auto w-[87%]">
-                  <img src="assets/video-recorder.svg" />
-                  <span class="text-gray-200 lg:text-base text-sm font-medium truncate" data-camera-device="">FaceTime HD Camera</span>
-                </div>
-                <img data-camera-dropdown-icon="" src="assets/chevron-down-white.svg" />
-              </div>
-              <div data-camera-dropdown-menu=""
-                class="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 hidden max-h-64 overflow-y-auto">
-                <div class="py-1"><!-- Options will be populated dynamically --></div>
-                <div class="border-t border-gray-600 p-2">
-                  <button id="refreshCameraDevices"
-                    class="w-full px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors flex items-center justify-center gap-2">
-                    Refresh Devices
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- MICROPHONE -->
-          <div class="flex flex-col gap-2">
-            <div class="h-6 flex items-center">
-              <h3 class="text-gray-50 text-sm font-semibold">MICROPHONE</h3>
-            </div>
-            <div class="relative">
-              <div data-microphone-dropdown-trigger=""
-                class="py-2 px-3 h-[4.4rem] flex items-center border border-[#EAECF080] rounded-[6px] bg-black/50 justify-between cursor-pointer hover:bg-black/70 transition-colors">
-                <div class="flex items-center gap-2 lg:flex-1 lg:w-auto w-[87%]">
-                  <img src="assets/microphone-01.svg" />
-                  <span class="text-gray-200 lg:text-base text-sm font-medium truncate" data-microphone-device="">
-                    MacBook Pro Microphone <span class="lg:inline hidden">(Built-in)</span>
-                  </span>
-                </div>
-                <img src="assets/chevron-down-white.svg" alt="icon" />
-              </div>
-              <div data-microphone-dropdown-menu=""
-                class="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 hidden max-h-64 overflow-y-auto">
-                <div class="py-1"><!-- Options will be populated dynamically --></div>
-                <div class="border-t border-gray-600 p-2">
-                  <button data-refresh-microphone-devices=""
-                    class="w-full px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors flex items-center justify-center gap-2">
-                    Refresh Devices
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- SPEAKER -->
-          <div class="flex flex-col gap-2">
-            <div class="h-6 flex items-center">
-              <h3 class="text-gray-50 text-sm font-semibold">SPEAKER</h3>
-            </div>
-            <div class="relative">
-              <div data-speaker-dropdown-trigger=""
-                class="py-2 px-3 h-[4.4rem] flex items-center border border-[#EAECF080] rounded-[6px] bg-black/50 justify-between cursor-pointer hover:bg-black/70 transition-colors">
-                <div class="flex items-center gap-2 lg:flex-1 lg:w-auto w-[87%]">
-                  <img src="assets/volume-max.svg" alt="icon" />
-                  <span class="text-gray-200 lg:text-base text-sm font-medium truncate" data-speaker-device="">
-                    MacBook Pro Speakers <span class="lg:inline hidden">(Built-in)</span>
-                  </span>
-                </div>
-                <img data-speaker-dropdown-icon="" id="speakerDropdownIcon" src="assets/chevron-down-white.svg" alt="icon" />
-              </div>
-              <div data-speaker-dropdown-menu=""
-                class="absolute top-full left-0 right-0 mt-1 bg-gray-800 border border-gray-600 rounded-lg shadow-lg z-50 hidden max-h-64 overflow-y-auto">
-                <div class="py-1"><!-- Options will be populated dynamically --></div>
-                <div class="border-t border-gray-600 p-2">
-                  <button data-refresh-speaker-devices=""
-                    class="w-full px-3 py-2 text-xs text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors flex items-center justify-center gap-2">
-                    Refresh Devices
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div class="status-section" data-cam-mic-element="device-select" style="margin-top: 20px;">
+          <label>Camera:</label>
+          <select data-cam-mic-element="video-select" data-camera-select></select>
+          <span data-cam-mic-element="selected-camera-label" style="font-size: 0.85em; color: #6c757d;"></span>
+          <label style="margin-left: 10px;">Mic:</label>
+          <select data-cam-mic-element="audio-select" data-microphone-select></select>
+          <span data-cam-mic-element="selected-microphone-label" style="font-size: 0.85em; color: #6c757d;"></span>
+        </div>
         </div>
       </div>
     `,

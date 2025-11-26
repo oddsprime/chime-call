@@ -175,7 +175,11 @@
                 <mobile-join-button :substate="substate" @join="handleJoinClick"></mobile-join-button>
               </div>
             </section>
-            <settings-panel :substate="substate" @join="handleJoinClick"></settings-panel>
+            <settings-panel 
+              :substate="substate" 
+              :chime-call-settings="chimeCallSettings"
+              @join="handleJoinClick"
+            ></settings-panel>
           </div>
         </div>
       </div>

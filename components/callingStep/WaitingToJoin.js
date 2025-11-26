@@ -17,15 +17,11 @@
         },
         template: `
            <div class="absolute h-full w-full flex justify-center items-center gap-4 flex-col bg-black/75">
-                <div class="lg:flex w-[12.0rem] h-[12.0rem] flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
-                 <img 
-                   :src="calleeAvatar" 
-                   alt="" 
-                   class="w-100 h-100 fit--cover absolute top-0 left-0"
-                   :data-initials="calleeInitials"
-                   :data-avatar-url="calleeAvatar ? calleeAvatar : 'not-found'"
-                 />
-                </div>
+                <DefaultAvatar
+                      :src="calleeAvatar"
+                      :initial="calleeInitials"
+                      size="w- w-[12.0rem] h-[12.0rem]"
+                    />
                 <span class="text-white text-sm truncate">Waiting for @{{ calleeUsername }} to join...</span>
             </div>
         `

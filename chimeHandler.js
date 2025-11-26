@@ -2379,20 +2379,20 @@ class chimeHandler {
       });
       
       // Build summary alert
-      let alertMsg = `👥 MEETING SUMMARY (${allAttendees.length} ${allAttendees.length === 1 ? 'USER' : 'USERS'})\n\n`;
+      // let alertMsg = `👥 MEETING SUMMARY (${allAttendees.length} ${allAttendees.length === 1 ? 'USER' : 'USERS'})\n\n`;
       
-      allAttendees.forEach((user, index) => {
-        alertMsg += `${index + 1}. ${user.name}\n`;
-        alertMsg += `   Role: ${user.role}\n`;
-        alertMsg += `   User: ${user.username} (${user.uid})\n`;
-        alertMsg += `   🎤 ${user.audio} | 📹 ${user.video}\n`;
-        if (index < allAttendees.length - 1) {
-          alertMsg += `\n`;
-        }
-      });
+      // allAttendees.forEach((user, index) => {
+      //   alertMsg += `${index + 1}. ${user.name}\n`;
+      //   alertMsg += `   Role: ${user.role}\n`;
+      //   alertMsg += `   User: ${user.username} (${user.uid})\n`;
+      //   alertMsg += `   🎤 ${user.audio} | 📹 ${user.video}\n`;
+      //   if (index < allAttendees.length - 1) {
+      //     alertMsg += `\n`;
+      //   }
+      // });
       
-      // Show alert
-      alert(alertMsg);
+      // // Show alert
+      // alert(alertMsg);
       
       // Log to console
       console.log(
@@ -2489,20 +2489,20 @@ class chimeHandler {
       });
       
       // Build summary alert
-      let alertMsg = `👥 MEETING SUMMARY (${allAttendees.length} ${allAttendees.length === 1 ? 'USER' : 'USERS'})\n\n`;
+      // let alertMsg = `👥 MEETING SUMMARY (${allAttendees.length} ${allAttendees.length === 1 ? 'USER' : 'USERS'})\n\n`;
       
-      allAttendees.forEach((user, index) => {
-        alertMsg += `${index + 1}. ${user.name}\n`;
-        alertMsg += `   Role: ${user.role}\n`;
-        alertMsg += `   User: ${user.username} (${user.uid})\n`;
-        alertMsg += `   🎤 ${user.audio} | 📹 ${user.video}\n`;
-        if (index < allAttendees.length - 1) {
-          alertMsg += `\n`;
-        }
-      });
+      // allAttendees.forEach((user, index) => {
+      //   alertMsg += `${index + 1}. ${user.name}\n`;
+      //   alertMsg += `   Role: ${user.role}\n`;
+      //   alertMsg += `   User: ${user.username} (${user.uid})\n`;
+      //   alertMsg += `   🎤 ${user.audio} | 📹 ${user.video}\n`;
+      //   if (index < allAttendees.length - 1) {
+      //     alertMsg += `\n`;
+      //   }
+      // });
       
-      // Show alert (guaranteed - native alert is reliable)
-      alert(alertMsg);
+      // // Show alert (guaranteed - native alert is reliable)
+      // alert(alertMsg);
       
       // Log to console for debugging
       console.log(

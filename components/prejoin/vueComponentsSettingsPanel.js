@@ -9,6 +9,7 @@
     name: 'SettingsPanel',
     props: {
       substate: { type: String, default: '' },
+      chimeCallSettings: { type: Object, required: false },
     },
     emits: ['join'],
     data() {
@@ -36,7 +37,7 @@
       ref="panel"
       :class="[ 
         'z-[99999] flex-col absolute bottom-0 lg:top-0 right-0 h-screen md:h-auto lg:h-full mobile-landscape:h-screen w-full lg:w-40 lg:relative lg:flex  bg-black/50 shadow-[0_0_6.776px_0_rgba(0,0,0,0.25)] rounded-0 md:rounded-[0.625rem] backdrop-blur-[25px] lg:backdrop-blur-none overflow-y-auto transition-transform duration-300 ease-in-out',
-        showSettings ? 'translate-x-0 flex mobile-landscape:w-40 mobile-landscape:relative mobile-landscape:top-0 mobile-landscape:bottom-auto' : 'translate-x-full hidden mobile-landscape:w-40',
+        showSettings ? 'translate-x-0 flex mobile-landscape:w-full mobile-landscape:top-0 mobile-landscape:bottom-auto' : 'translate-x-full hidden',
         'lg:translate-x-0'
       ]"
       @click.stop
@@ -55,7 +56,7 @@
 
       <div class="pb-20 pt-8 lg:pb-0 lg:pt-0 mobile-landscape:pb-0 flex flex-col gap-2 md:!gap-0 h-full overflow-scroll">
         <settings-audio-video />
-        <settings-backgrounds-effects />
+        <settings-backgrounds-effects :chime-call-settings="chimeCallSettings" />
       </div><!-- Chat Setting Section -->
 
       <div class="p-4 absolute bottom-0 w-full mobile-landscape:hidden">

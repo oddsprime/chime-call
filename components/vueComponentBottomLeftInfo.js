@@ -11,22 +11,11 @@
       template: `
         <div class="lg:flex items-center gap-2 xl:!gap-4 xl:w-1/3 hidden">
           <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
-            <img 
-              v-if="avatarSrc" 
-              :src="avatarSrc" 
-              alt="" 
-              class="w-100 h-100 fit--cover absolute top-0 left-0"
-              :data-initials="userInitials"
-              :data-avatar-url="avatarSrc ? avatarSrc : 'not-found'"
-            >
-            <img 
-              v-else
-              src="" 
-              alt="" 
-              class="w-100 h-100 fit--cover absolute top-0 left-0"
-              :data-initials="userInitials"
-              data-avatar-url="not-found"
-            >
+            <DefaultAvatar
+                :src="avatarSrc"
+                :initial="userInitials"
+                size="w-100 h-100 fit--cover absolute top-0 left-0"
+              />
           </div>
           <div class="flex-1">
             <div class="lg:flex hidden items-center gap-1">
