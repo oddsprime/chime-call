@@ -97,8 +97,8 @@
       const blurEnabled = ref(false);
       const selectedBackgroundIndex = ref(null);
       const backgroundImages = ref([
-        { name: 'Red', url: '/red.jpg' },
-        { name: 'Blue', url: '/blue.png' }
+        { name: 'Red', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/red.jpg' },
+        { name: 'Blue', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/blue.png' }
       ]);
 
       function onAccordionOpen(e) {
