@@ -129,7 +129,7 @@
       max-width: 520px;
       background: #000;
       object-fit: cover;
-      border-radius: 0 !important;
+      /* border-radius: 0 !important; */
     }
 
     .slide-enter-active,
@@ -2180,8 +2180,8 @@
 
               // Background images data
               const backgroundImages = [
-                { name: 'Red', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/red.jpg' },
-                { name: 'Blue', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/blue.png' }
+                { name: 'Red', url: './red.jpg' },
+                { name: 'Blue', url: './blue.png' }
               ];
               
               // Handle blur checkbox change
@@ -2550,7 +2550,7 @@
 
       // One source of truth for base classes
       const BASE_TILE =
-        "tile flex items-center justify-center rounded-xl border border-slate-300 bg-slate-900 text-white video-card";
+        "tile flex items-center justify-center border border-slate-300 bg-slate-900 text-white video-card";
 
       const MINI_OVERLAY = "mini-overlay";
       const FULL_VIEW = "full-view";
@@ -2924,9 +2924,9 @@ CallHandler.dipatchUI("caller:startCall");
           }
       
           // base & helper functions (keeps existing "video-card" or "hidden")
-          const BASE_TILE    = "tile flex items-center justify-center rounded-xl border-slate-300 bg-slate-900 text-white";
-          const MINI_OVERLAY = "absolute bottom-[10rem] right-4 w-[25rem] h-[15rem] z-50 rounded-xl overflow-hidden";
-          const FULL_VIEW    = "absolute inset-0 w-auto h-auto rounded-xl";
+          const BASE_TILE    = "tile flex items-center justify-center border-slate-300 bg-slate-900 text-white";
+          const MINI_OVERLAY = "absolute bottom-[10rem] right-4 w-[25rem] h-[15rem] z-50 rounded-xl shadow-[0_0_25px_#1d1d1d] overflow-hidden";
+          const FULL_VIEW    = "absolute inset-0 w-auto h-auto";
       
           function setBase(el) {
             if (!el) return;

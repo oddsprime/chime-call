@@ -24,7 +24,7 @@
       },
       template: `
           <div data-icon-style="toggle" @click.stop="toggleChat"
-                :class="['w-12 lg:w-17 h-12 lg:h-17 rounded-full flex items-center justify-center cursor-pointer transition-colors duration-300',
+                :class="['w-12 lg:w-17 h-12 lg:h-17 rounded-full flex items-center justify-center cursor-pointer transition-colors duration-300 shadow-[0_0_8px_0_rgba(0,0,0,0.25)]',
                   chimeCallSettings?.callChatStatus ? 'bg-white/75' : 'bg-white/10'
                 ]"
                aria-label="Toggle chat">

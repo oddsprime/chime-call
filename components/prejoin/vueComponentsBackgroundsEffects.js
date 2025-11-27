@@ -45,13 +45,11 @@
         >
           <!-- Toggle button (replaces checkbox) -->
           <div>
-            <!-- Accessible toggle using a hidden checkbox + visual track/knob -->
             <label
               class="flex items-center justify-between gap-3 w-full max-w-[26.0rem] rounded-full px-3 py-2 cursor-pointer"
               title="Toggle background blur"
             >
               <span class="relative inline-block w-12 h-6">
-                <!-- visually-hidden checkbox for accessibility -->
                 <input
                   type="checkbox"
                   class="sr-only"
@@ -59,37 +57,36 @@
                   @change="toggleBlur"
                   aria-label="Apply Background Blur"
                 />
-                <!-- track -->
                 <span :class="['absolute inset-0 rounded-full transition-colors', blurEnabled ? 'bg-green-500' : 'bg-gray-400']"></span>
                 <span :class="['absolute top-[0.2rem] left-[0.2rem] w-5 h-5 bg-white rounded-full transition-transform', blurEnabled ? 'translate-x-6' : 'translate-x-0']"></span>
               </span>
               <span class="text-white font-medium text-base">Apply Background Blur</span>
             </label>
-           </div>
- 
-           <div>
-             <p class="text-white font-medium text-base">Virtual Background</p>
-             <div class="mt-[10px] flex flex-wrap gap-2">
-               <div
-                 v-for="(bg, index) in backgroundImages"
-                 :key="index"
-                 @click="handleBackgroundImageClick(index, bg.url)"
-                 :class="[
-                   'h-[72px] w-[86px] rounded-xl overflow-hidden cursor-pointer',
-                   chimeCallSettings?.callSettings?.backgroundImageUrl === bg.url ? 'border-[3px] border-green-400' : 'border border-[#FFFFFF80]'
-                 ]"
-               >
-                 <img
-                   :src="bg.url"
-                   :alt="bg.name"
-                   class="h-full w-full object-cover"
-                 />
-               </div>
-             </div>
-           </div>
-         </div>
-       </div>
-     `,
+          </div>
+
+          <div>
+            <p class="text-white font-medium text-base">Virtual Background</p>
+            <div class="mt-[10px] flex flex-wrap gap-2">
+              <div
+                v-for="(bg, index) in backgroundImages"
+                :key="index"
+                @click="handleBackgroundImageClick(index, bg.url)"
+                :class="[ 
+                  'h-[72px] w-[86px] rounded-xl overflow-hidden cursor-pointer',
+                  selectedBackgroundIndex === index ? 'border-[3px] border-green-400' : 'border border-[#FFFFFF80]'
+                ]"
+              >
+                <img
+                  :src="bg.url"
+                  :alt="bg.name"
+                  class="h-full w-full object-cover"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `,
     setup() {
       const accordionId = 'settings-backgrounds-effects';
       const isOpen = ref(false);
@@ -97,8 +94,8 @@
       const blurEnabled = ref(false);
       const selectedBackgroundIndex = ref(null);
       const backgroundImages = ref([
-        { name: 'Red', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/red.jpg' },
-        { name: 'Blue', url: 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/blue.png' }
+        { name: 'Red', url: 'red.jpg' },
+        { name: 'Blue', url: 'blue.png' }
       ]);
 
       function onAccordionOpen(e) {
@@ -132,11 +129,21 @@
       }
 
       function handleBackgroundImageClick(index, imageUrl) {
-        selectedBackgroundIndex.value = index;
-        console.log('[SettingsBackgroundsEffects] Background clicked:', imageUrl);
+        // Check if the clicked background is already selected
+        if (selectedBackgroundIndex.value === index) {
+          // Deselect the background
+          selectedBackgroundIndex.value = null;
+          console.log('[SettingsBackgroundsEffects] Background deselected:', imageUrl);
+        } else {
+          // Select the new background
+          selectedBackgroundIndex.value = index;
+          console.log('[SettingsBackgroundsEffects] Background clicked:', imageUrl);
+        }
+
+        // Dispatch the event regardless of selection state
         document.dispatchEvent(new CustomEvent('app:background:image', {
           detail: {
-            imageUrl: imageUrl,
+            imageUrl: selectedBackgroundIndex.value !== null ? imageUrl : null, // Send null if deselected
             type: 'virtual-background',
             timestamp: Date.now()
           }

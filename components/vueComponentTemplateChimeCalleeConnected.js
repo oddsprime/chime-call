@@ -60,6 +60,9 @@
       if (vc.JoinCallButton) {
         comps.JoinCallButton = vc.JoinCallButton;
       }
+      if (vc.StatusIcons) {
+        comps.StatusIcons = vc.StatusIcons;
+      }
       return comps;
     })(),
     mounted() {
@@ -141,7 +144,7 @@
                   </div> 
                  
                   <!--<video data-cm-video-preview="" class="w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>-->
-                   <video data-cam-mic-element="video-preview" class="absolute w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>
+                   <video data-cam-mic-element="video-preview" class="absolute w-full h-full max-w-full object-cover rounded-[0.25rem] " autoplay="" playsinline=""></video>
 
                   <!-- Status Icons - Simple HTML using Vue reactive data -->
                   <div style="position: absolute; top: 5px; right: 5px; z-index: 999; display: flex; gap: 8px; font-size: 11px; font-weight: bold; font-family: monospace; pointer-events: none;">
@@ -185,8 +188,7 @@
                     after:border-8 after:border-transparent after:border-t-white/70"
                 >
                     <div class="always-visible-tooltip text-[#101828] text-center font-poppins text-[1.2rem] font-medium leading-[1.8rem]" >
-                        It looks like your camera and mic are off. Turn them on for a smoother,
-                        more engaging experience!
+                        It looks like your camera or mic are off. Turn them on for a smoother, more engaging experience!
                     </div>
                 </div>
                   <camera-mic-controls :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" :chime-call-settings="chimeCallSettings"/>

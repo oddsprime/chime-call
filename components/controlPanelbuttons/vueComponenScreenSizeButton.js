@@ -37,7 +37,7 @@
     template: `
       <div
         data-toggle-screensize
-        class="w-12 lg:w-17 h-12 lg:h-17 rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer"
+        class="w-12 lg:w-17 h-12 lg:h-17 rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer shadow-[0_0_8px_0_rgba(0,0,0,0.25)]"
         role="button"
         aria-label="Toggle fullscreen"
         @click="handleToggle"

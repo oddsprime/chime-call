@@ -28,7 +28,7 @@
           :aria-pressed="enabled"
           :aria-label="ariaLabel"
           :class="[
-            buttonClasses || (buttonSizeClasses + ' rounded-full flex items-center justify-center cursor-pointer transition-all duration-200'),
+            buttonClasses || (buttonSizeClasses + ' rounded-full flex items-center justify-center cursor-pointer transition-all duration-200 shadow-[0_0_8px_0_rgba(0,0,0,0.25)]'),
             enabled ? 'bg-white/75' : 'bg-white/5'
           ]"
           @click="handleClick"

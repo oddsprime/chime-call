@@ -2775,7 +2775,16 @@ class chimeHandler {
     // Check if indicator already exists
     let indicator = container.querySelector('.video-off-indicator');
     if (indicator) {
-      return indicator;
+      const existingAttendeeId = indicator.getAttribute('data-attendee-id');
+      // If attendee ID changed, clean up old indicator first
+      if (existingAttendeeId && existingAttendeeId !== attendeeId) {
+        console.log(`[_createVideoOffIndicator] Found existing indicator for different attendee (${existingAttendeeId?.substring(0,8)}...) - cleaning up before creating new one`);
+        this._cleanupVideoOffIndicator(container, existingAttendeeId);
+        indicator = null; // Will create new one below
+      } else {
+        // Same attendee, return existing indicator
+        return indicator;
+      }
     }
 
     indicator = document.createElement("div");
@@ -2859,19 +2868,75 @@ class chimeHandler {
         avatarUrl, displayName, initials, currentUserSide, isLocal
       });
     }
-    indicator.innerHTML = `
-      <div class="absolute w-[12.0rem] h-[12.1rem] z-1 flex justify-center items-center">
-      </div>
-      <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
-        <img 
-          src="${avatarUrl}" 
-          alt="${displayName}"
-          class="w-100 h-100 fit--cover absolute top-0 left-0"
-          data-initials="${initials}"
-          data-avatar-url="${avatarUrl || 'not-found'}"
-        >
-      </div>
-    `;
+
+    // Use Vue component with DefaultAvatar instead of innerHTML
+    if (window.Vue && typeof registerDefaultAvatar === 'function') {
+      const { createApp, defineComponent } = window.Vue;
+      
+      // Create wrapper for Vue component
+      const wrapper = document.createElement('div');
+      wrapper.className = 'video-off-indicator-content';
+      indicator.appendChild(wrapper);
+      
+      // Create inline component that uses DefaultAvatar
+      const VideoOffIndicatorContent = defineComponent({
+        props: {
+          avatarSrc: { type: String, default: '' },
+          userInitials: { type: String, default: 'US' }
+        },
+        template: `
+          <div class="absolute w-[12.0rem] h-[12.1rem] z-1 flex justify-center items-center">
+          </div>
+          <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
+            <DefaultAvatar
+              :src="avatarSrc"
+              :initial="userInitials"
+              size="w-100 h-100 fit--cover absolute top-0 left-0"
+            />
+          </div>
+        `
+      });
+      
+      // Create Vue app instance
+      const app = createApp(VideoOffIndicatorContent, {
+        avatarSrc: avatarUrl,
+        userInitials: initials
+      });
+      
+      // Register DefaultAvatar component
+      registerDefaultAvatar(app);
+      
+      // Mount Vue component
+      app.mount(wrapper);
+      
+      // Store app instance for cleanup
+      if (!this._videoOffIndicatorApps) {
+        this._videoOffIndicatorApps = new Map();
+      }
+      this._videoOffIndicatorApps.set(`${container.id || 'no-id'}-${attendeeId}`, {
+        app: app,
+        wrapper: wrapper,
+        attendeeId: attendeeId
+      });
+      
+      console.log(`[_createVideoOffIndicator] ✅ Mounted Vue component with DefaultAvatar for ${attendeeId.substring(0, 8)}...`);
+    } else {
+      // Fallback to innerHTML if Vue is not available
+      console.warn(`[_createVideoOffIndicator] Vue or DefaultAvatar not available, using fallback innerHTML`);
+      indicator.innerHTML = `
+        <div class="absolute w-[12.0rem] h-[12.1rem] z-1 flex justify-center items-center">
+        </div>
+        <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
+          <img 
+            src="${avatarUrl}" 
+            alt="${displayName}"
+            class="w-100 h-100 fit--cover absolute top-0 left-0"
+            data-initials="${initials}"
+            data-avatar-url="${avatarUrl || 'not-found'}"
+          >
+        </div>
+      `;
+    }
 
     container.appendChild(indicator);
     console.log(`[_createVideoOffIndicator] ✅ Created indicator for ${attendeeId.substring(0, 8)}... (visible by default - showing avatar)`);
@@ -3321,6 +3386,43 @@ class chimeHandler {
       // Remove wrapper from DOM
       wrapper.remove();
       console.log(`[_cleanupStatusIcons] ✅ Removed status icons wrapper for ${wrapperAttendeeId?.substring(0, 8)}...`);
+    }
+  }
+
+  /* ====================================================================
+   * _cleanupVideoOffIndicator(container, attendeeId) - Clean Up Video Off Indicator
+   * Unmounts Vue component and removes indicator
+   * ==================================================================== */
+  static _cleanupVideoOffIndicator(container, attendeeId) {
+    if (!container) {
+      console.warn(`[_cleanupVideoOffIndicator] No container provided`);
+      return;
+    }
+
+    // Find indicator for this attendee
+    const indicator = container.querySelector('.video-off-indicator');
+    
+    if (indicator) {
+      const indicatorAttendeeId = indicator.getAttribute('data-attendee-id');
+      
+      // Unmount Vue app if it exists
+      if (this._videoOffIndicatorApps) {
+        const appKey = `${container.id || 'no-id'}-${indicatorAttendeeId}`;
+        const appData = this._videoOffIndicatorApps.get(appKey);
+        if (appData && appData.app) {
+          try {
+            appData.app.unmount();
+            console.log(`[_cleanupVideoOffIndicator] ✅ Unmounted Vue app for ${indicatorAttendeeId?.substring(0, 8)}...`);
+          } catch (e) {
+            console.warn(`[_cleanupVideoOffIndicator] Error unmounting Vue app:`, e);
+          }
+          this._videoOffIndicatorApps.delete(appKey);
+        }
+      }
+      
+      // Remove indicator from DOM
+      indicator.remove();
+      console.log(`[_cleanupVideoOffIndicator] ✅ Removed video-off-indicator for ${indicatorAttendeeId?.substring(0, 8)}...`);
     }
   }
 

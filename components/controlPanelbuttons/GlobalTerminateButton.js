@@ -6,7 +6,7 @@
       template: `
         <button 
           type="button" 
-          class="h-[68px] w-[68px] rounded-full bg-[#FF4405] flex items-center justify-center cursor-pointer" 
+          class="h-[68px] w-[68px] rounded-full bg-[#FF4405] flex items-center justify-center cursor-pointer shadow-[0_0_8px_0_rgba(0,0,0,0.25)]" 
           aria-label="End call"
           @click="$emit('terminate')"
         >

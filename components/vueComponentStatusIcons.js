@@ -13,7 +13,8 @@
     props: {
       attendeeId: {
         type: String,
-        required: true
+        required: false,
+        default: null
       }
     },
     setup(props) {
@@ -31,20 +32,39 @@
       
       // Sync from settings
       function syncFromSettings() {
-        if (window.ChimeSettingsUtility) {
-          const state = window.ChimeSettingsUtility.getAttendeeState(props.attendeeId);
+        if (props.attendeeId) {
+          // If attendeeId is provided, use ChimeSettingsUtility (existing behavior)
+          if (window.ChimeSettingsUtility) {
+            const state = window.ChimeSettingsUtility.getAttendeeState(props.attendeeId);
+            
+            // DEBUG: Log state changes
+            if (videoEnabled.value !== state.videoEnabled || audioEnabled.value !== state.audioEnabled) {
+              console.log(`[StatusIcons] ? State changed for ${props.attendeeId.substring(0, 8)}...`, {
+                old: { video: videoEnabled.value, audio: audioEnabled.value },
+                new: { video: state.videoEnabled, audio: state.audioEnabled },
+                source: 'window.settings.attendees'
+              });
+            }
+            
+            videoEnabled.value = state.videoEnabled;
+            audioEnabled.value = state.audioEnabled;
+          }
+        } else {
+          // If no attendeeId, read directly from window.settings (local status)
+          const camStatus = window.settings?.callCamStatus ?? false;
+          const micStatus = window.settings?.callMicStatus ?? false;
           
           // DEBUG: Log state changes
-          if (videoEnabled.value !== state.videoEnabled || audioEnabled.value !== state.audioEnabled) {
-            console.log(`[StatusIcons] 🔄 State changed for ${props.attendeeId.substring(0, 8)}...`, {
+          if (videoEnabled.value !== camStatus || audioEnabled.value !== micStatus) {
+            console.log(`[StatusIcons] ? Local state changed`, {
               old: { video: videoEnabled.value, audio: audioEnabled.value },
-              new: { video: state.videoEnabled, audio: state.audioEnabled },
-              source: 'window.settings.attendees'
+              new: { video: camStatus, audio: micStatus },
+              source: 'window.settings (local)'
             });
           }
           
-          videoEnabled.value = state.videoEnabled;
-          audioEnabled.value = state.audioEnabled;
+          videoEnabled.value = camStatus;
+          audioEnabled.value = micStatus;
         }
       }
       
@@ -63,7 +83,8 @@
         // CRITICAL: Store in LOCAL variable, not global!
         intervalId = setInterval(syncFromSettings, 100);
         
-        console.log(`[StatusIcons] ✅ Mounted for ${props.attendeeId.substring(0, 8)}... - syncing from settings every 100ms`);
+        const logId = props.attendeeId ? `${props.attendeeId.substring(0, 8)}...` : 'local';
+        console.log(`[StatusIcons] ✅ Mounted for ${logId} - syncing from settings every 100ms`);
       });
       
       // Cleanup on unmount
@@ -71,7 +92,8 @@
         if (intervalId) {
           clearInterval(intervalId);
           intervalId = null;
-          console.log(`[StatusIcons] 🧹 Unmounted for ${props.attendeeId.substring(0, 8)}... - cleared interval`);
+          const logId = props.attendeeId ? `${props.attendeeId.substring(0, 8)}...` : 'local';
+          console.log(`[StatusIcons] ? Unmounted for ${logId} - cleared interval`);
         }
       });
       
