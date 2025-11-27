@@ -459,7 +459,7 @@ function renderMediaCard(item) {
   let typeIcon = "camera-03";
   if (item.type === "audio") typeIcon = "recording-02";
   if (item.type === "video") typeIcon = "play-square";
-  if (item.type === "image-gallery") typeIcon = "image-02";
+  if (item.type === "image-gallery") typeIcon = "image-03";
 
   const cardDiv = document.createElement("div");
   cardDiv.className = "mt-2";
@@ -481,9 +481,9 @@ function renderMediaCard(item) {
             <img src="${item.thumbnail_url || "https://picsum.photos/seed/v1/900/600"}" alt="Sunday by the River - watch me catch a 10 kg..." class="w-full max-h-60 object-cover aspect-[344/198.16]" loading="lazy">
           </div>
           <div class="absolute top-1 left-1">
-            <span class="px-1 py-[1px] flex items-center justify-center gap-[3px] bg-gray-600">
+            <span class="px-[0.4rem] py-[1px] flex items-center justify-center gap-[3px] bg-gray-600">
               <span>
-                <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/assets/icons/svg/${typeIcon}.svg" alt="" class="w-[1rem] h-[1rem] selected-media-icon invert">
+                <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/assets/icons/svg/${typeIcon}.svg" alt="" class="w-[1.6rem] h-[1.6rem] selected-media-icon invert">
               </span>
               ${durationOrCount ? `<span class="text-[11px] text-white">${escapeHtml(durationOrCount)}</span>` : ''}
             </span>
@@ -728,7 +728,7 @@ function renderSubscriptionCard(item) {
                   </div>
                 </div>
               </div>
-              <div class="flex justify-end w-[96%] bottom-0 absolute">
+              <div class="flex justify-end w-full pl-[1.6rem] left-0 right-0 bottom-0 absolute">
                 <div class="flex w-full items-center gap-2">
                   <p class="text-xs font-medium text-[#FF0066]">See Perks</p>
                   <img src="assets/svgs/chevron-down-double.svg" alt="">

@@ -38,7 +38,7 @@ const MediaCardsPanel = defineComponent({
             let typeIcon = "camera-03";
             if (item.type === "audio") typeIcon = "recording-02";
             if (item.type === "video") typeIcon = "play-square";
-            if (item.type === "image-gallery") typeIcon = "image-02";
+            if (item.type === "image-gallery") typeIcon = "image-03";
 
             return {
               ...item,
@@ -225,7 +225,7 @@ const MediaCardsPanel = defineComponent({
           <!--  <h3 class="font-semibold text-white">Media</h3> -->
             <div class="absolute left-0 bottom-0 p-4 w-full z-10">
               <!-- selected media length-->
-              <button @click="pushToChat('media')" class="px-4 py-[10px] bg-[#07F468] text-black text-sm rounded-full w-full">
+              <button @click="pushToChat('media')" class="px-4 py-[10px] bg-[#07F468] text-black text-base font-semibold leading-6 rounded-full w-full">
                 Send to chat 
               </button>
             </div>
@@ -239,8 +239,8 @@ const MediaCardsPanel = defineComponent({
                 <div class="w-full relative aspect-[179/103.11] overflow-hidden"
                   :style="{backgroundImage:'url('+m.background_image+')', backgroundSize:'cover', backgroundPosition:'center'}">
                   <div class="absolute bg-black/50 py-[1px] px-1 top-0 left-0">
-                    <div class="flex gap-1">
-                      <img :src="'/wp-content/plugins/fansocial/assets/icons/svg/' + m.typeIcon + '.svg'" alt="" class="w-[16px] h-[16px] attach-media-icon">
+                    <div class="flex gap-1 items-center">
+                      <img :src="'https://new-stage.fansocial.app/wp-content/plugins/fansocial/assets/icons/svg/' + m.typeIcon + '.svg'" alt="" class="w-[16px] h-[16px] attach-media-icon invert">
                       <p v-if="m.durationOrCount > 0" class="text-xs text-white font-medium">
                         {{ m.durationOrCount }}
                       </p>

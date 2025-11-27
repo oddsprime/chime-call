@@ -203,7 +203,7 @@ const MerchCardsPanel = defineComponent({
           <!--  <h3 class="font-semibold text-white">Merch</h3> -->
             <div class="absolute left-0 bottom-0 p-4 w-full z-10">
               <!-- selected media length-->
-              <button @click="pushToChat('merch')" class="px-4 py-[10px] bg-[#07F468] text-black text-sm rounded-full w-full">
+              <button @click="pushToChat('merch')" class="px-4 py-[10px] bg-[#07F468] text-black text-base font-semibold leading-6 rounded-full w-full">
                 Send to chat
               </button>
             </div>
@@ -444,7 +444,7 @@ const SubscriptionCardsPanel = defineComponent({
           <!--  <h3 class="font-semibold text-white">Subscriptions</h3> -->
             <div class="absolute left-0 bottom-0 p-4 w-full z-10">
               <!-- selected media length-->
-              <button @click="pushToChat('subs')" class="px-4 py-[10px] bg-[#07F468] text-black text-sm rounded-full w-full">
+              <button @click="pushToChat('subs')" class="px-4 py-[10px] bg-[#07F468] text-black text-base font-semibold leading-6 rounded-full w-full">
                 Send to chat
               </button>
             </div>
