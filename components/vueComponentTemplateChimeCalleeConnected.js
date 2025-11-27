@@ -141,7 +141,27 @@
                   </div> 
                  
                   <!--<video data-cm-video-preview="" class="w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>-->
- <video data-cam-mic-element="video-preview" class="absolute w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>
+                   <video data-cam-mic-element="video-preview" class="absolute w-full h-full max-w-full object-cover rounded-[0.25rem] py-2 lg:py-0" autoplay="" playsinline=""></video>
+
+                  <!-- Status Icons - Simple HTML using Vue reactive data -->
+                  <div style="position: absolute; top: 5px; right: 5px; z-index: 999; display: flex; gap: 8px; font-size: 11px; font-weight: bold; font-family: monospace; pointer-events: none;">
+                    <span :style="{
+                      color: chimeCallSettings && chimeCallSettings.callCamStatus ? '#0f0' : '#f00',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '2px 6px',
+                      borderRadius: '3px'
+                    }">
+                      {{ chimeCallSettings && chimeCallSettings.callCamStatus ? 'VID ON' : 'VID OFF' }}
+                    </span>
+                    <span :style="{
+                      color: chimeCallSettings && chimeCallSettings.callMicStatus ? '#0f0' : '#f00',
+                      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                      padding: '2px 6px',
+                      borderRadius: '3px'
+                    }">
+                      {{ chimeCallSettings && chimeCallSettings.callMicStatus ? 'MIC ON' : 'MIC OFF' }}
+                    </span>
+                  </div>
 
                   <connecting-section :show="substate === 'connecting'"></connecting-section>
                 </div>
@@ -151,14 +171,14 @@
                 :user-name="callerUsername"
               ></prejoin-mobile-header>
               <back-button :show="substate !== 'connecting'"></back-button>
-              <div class="flex flex-col lg:flex-row z-10 gap-2 justify-between left-0 right-0 lg:rounded-none rounded-full items-center lg:relative absolute bottom-4 lg:bottom-0 lg:w-full w-full lg:mx-0 px-4 md:!px-0 py-0">
+              <div class="flex flex-col lg:flex-row z-10 gap-2 justify-between left-0 right-0 lg:rounded-none rounded-full items-center lg:relative absolute bottom-4 lg:bottom-0 lg:w-full w-full lg:mx-0 px-4 py-0">
                 <bottom-left-info 
                   :user-initials="callerInitials" 
                   :avatar-src="callerAvatar"
                   :user-name="callerUsername"
                   :mode-text="callModeText"
                 />
-                <div class="flex items-center justify-center sm:gap-4 gap-3 flex-1 sm:justify-center lg:relative relative pb-[3rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
+                <div class="flex items-center justify-center sm:gap-4 gap-[1.2rem] flex-1 sm:justify-center lg:relative relative pb-[4.8rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
                   
                 <div v-if="chimeCallSettings && !chimeCallSettings.callCamStatus" class="tooltip-wrapper bg-white/70 flex justify-center absolute top-[-70px] w-[34.0rem] rounded-xl px-3 py-2
                     after:content-[''] after:absolute after:bottom-[-1.5rem] after:left-1/2 after:-translate-x-1/2

@@ -13,8 +13,15 @@
       callMicStatus: false,
       callChatStatus: false,
       userAvatarUrl: '',
-      userType: ''
+      userType: '',
+      // Store all attendee video/audio states (single source of truth)
+      attendees: {}  // { 'attendee-id': { videoEnabled: bool, audioEnabled: bool } }
     };
+  }
+  
+  // Ensure attendees object exists even if settings was pre-initialized
+  if (!window.settings.attendees) {
+    window.settings.attendees = {};
   }
 
   // Global utility object
@@ -79,6 +86,67 @@
      */
     isInitialized() {
       return typeof window.settings !== 'undefined' && window.settings !== null;
+    },
+
+    /**
+     * Get attendee video/audio state from settings
+     * @param {string} attendeeId - Chime attendee ID
+     * @returns {{ videoEnabled: boolean, audioEnabled: boolean }}
+     */
+    getAttendeeState(attendeeId) {
+      if (!window.settings?.attendees) {
+        window.settings.attendees = {};
+      }
+      const state = window.settings.attendees[attendeeId] || { videoEnabled: false, audioEnabled: false };
+      
+      // DEBUG: Log first time state is read for this attendee
+      if (!window.settings.attendees[attendeeId]) {
+        console.log(`[ChimeSettingsUtility] ⚠️ No state found for ${attendeeId.substring(0,8)}... - returning default:`, state);
+      }
+      
+      return state;
+    },
+    
+    /**
+     * Set attendee video/audio state in settings (single source of truth)
+     * @param {string} attendeeId - Chime attendee ID
+     * @param {{ videoEnabled?: boolean, audioEnabled?: boolean }} state
+     */
+    setAttendeeState(attendeeId, state) {
+      if (!window.settings?.attendees) {
+        window.settings.attendees = {};
+      }
+      const current = window.settings.attendees[attendeeId] || {};
+      window.settings.attendees[attendeeId] = {
+        ...current,
+        ...state
+      };
+      
+      console.log(`[ChimeSettingsUtility] ✅ Set attendee state for ${attendeeId.substring(0,8)}...`, window.settings.attendees[attendeeId]);
+      
+      // Trigger Vue reactivity if using Vue
+      if (window.vueApp?.$forceUpdate) {
+        window.vueApp.$forceUpdate();
+      }
+    },
+    
+    /**
+     * Remove attendee state (on disconnect)
+     * @param {string} attendeeId - Chime attendee ID
+     */
+    removeAttendeeState(attendeeId) {
+      if (window.settings?.attendees?.[attendeeId]) {
+        delete window.settings.attendees[attendeeId];
+        console.log(`[ChimeSettingsUtility] 🗑️ Removed attendee state for ${attendeeId.substring(0,8)}...`);
+      }
+    },
+    
+    /**
+     * Get all attendee states
+     * @returns {Object} All attendee states
+     */
+    getAllAttendeeStates() {
+      return window.settings?.attendees || {};
     }
   };
 

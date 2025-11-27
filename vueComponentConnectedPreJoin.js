@@ -98,7 +98,7 @@ const ConnectedPreJoin = defineComponent({
           <aside data-sidebar-pannel="" data-call-settings-panel="" class="z-[99999] flex-col lg:w-40 py-4 h-full sm:h-screen lg:h-full md:h-screen absolute lg:relative overflow-y-auto g-2 bg-black/50 shadow-control lg:flex w-full backdrop-blur-md flex-col hidden lg:flex">
             <!-- Settings Header & Content -->
             <div class="text-white cursor-pointer lg:hidden flex items-end justify-end pr-3 absolute top-[0.25rem] right-[0]">
-              <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x-close.png" class="w-6 h-6 object-cover">
+              <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x.svg" class="w-6 h-6 object-cover">
             </div>
             <div>
               <!-- Audio Video Accordion Header -->

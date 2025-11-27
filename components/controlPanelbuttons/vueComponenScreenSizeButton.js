@@ -42,12 +42,15 @@
         aria-label="Toggle fullscreen"
         @click="handleToggle"
       >
-        <img
-          :src="isFullscreen 
-            ? 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/minimize-02.svg'
-            : 'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/maximize-02.svg'"
+        <img v-show="isFullscreen"
+          src="'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/minimize-02.svg"
           class="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
-          :alt="isFullscreen ? 'Exit fullscreen' : 'Toggle fullscreen'"
+          alt="Exit fullscreen"
+        />
+        <img v-show="!isFullscreen"
+          src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/maximize-02.svg"
+          class="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
+          alt="Toggle fullscreen'"
         />
       </div>
     `,

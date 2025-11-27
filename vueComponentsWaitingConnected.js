@@ -160,7 +160,7 @@ const WaitingConnected = defineComponent({
                         </div>
                         <h3 class="text-white font-medium text-[16px]">CHAT</h3>
                       </div>
-                      <img @click="setActivePanel(null);" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x-close.png" class="w-6 h-6 object-cover lg:hidden flex cursor-pointer">
+                      <img @click="setActivePanel(null);" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x.svg" class="w-6 h-6 object-cover lg:hidden flex cursor-pointer">
                     </div>
                     <!-- Chat Messages -->
                     <div id="chat-messages" class="mt-4 max-h-[83.6vh] overflow-y-auto no-scrollbar" data-chat-messages-global="">

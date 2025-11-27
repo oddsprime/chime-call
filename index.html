@@ -81,6 +81,7 @@
   <script src="components/prejoin/vueComponentsSettingsPanel.js" defer></script>
   <script src="components/prejoin/vueComponentsMobileJoinButton.js" defer></script>
   <script src="components/vueComponentTemplateChimeCalleeConnected.js" defer></script>
+  <script src="components/vueComponentStatusIcons.js" defer></script>
 
   <!-- Bottom Panel Buttons -->
   <script src="components/controlPanelbuttons/vueComponenChatButton.js" defer></script>
@@ -106,6 +107,7 @@
   <script src="components/callingStep/CallMissed.js"></script>
   <script src="components/callingStep/WaitingToJoin.js"></script>
   <script src="components/vueComponentAvatar.js"></script>
+  
 
 
   <style>
@@ -2256,6 +2258,7 @@
           if (typeof registerBottomRightControls === 'function') registerBottomRightControls(app);
           if (typeof registerBottomControls === 'function') registerBottomControls(app);
           if (typeof registerMobileHeader === 'function') registerMobileHeader(app);
+          if (typeof registerStatusIcons === 'function') registerStatusIcons(app);
 
           // Bottom Panel Buttons
           if (typeof registerChatButton === 'function') registerChatButton(app);
