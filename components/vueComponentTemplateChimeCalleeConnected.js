@@ -130,7 +130,7 @@
     },
     template: `
       <div template-chime-callee-connected>
-        <div class="w-full h-dvh max-h-dvh xl:h-screen relative bg-cover bg-center bg-no-repeat bg-black/50 backdrop-blur-sm bg-[url(assets/bg-girl-image-call.png)]">
+        <div class="w-full h-dvh max-h-dvh xl:h-screen relative bg-cover bg-center bg-no-repeat backdrop-blur-sm">
           <div class="w-full h-dvh lg:h-full max-h-dvh xl:max-h-full inset-0 bg-black/50 backdrop-blur-lg lg:p-2 flex items-center gap-2 mx-auto">
             <section class="flex-1 flex flex-col gap-2 relative h-dvh lg:h-full max-h-dvh lg:max-h-full">
               <div class="flex-1 relative rounded-card-xs bg-cover bg-center overflow-hidden">
@@ -184,7 +184,7 @@
                 <div class="flex items-center justify-center sm:gap-4 gap-[1.2rem] flex-1 sm:justify-center lg:relative relative pb-[4.8rem] lg:pb-[0rem] left-0 right-0 lg:mx-0 mx-auto lg:w-1/3 w-full md:w-[calc(100%-424px)] sm:w-full">
                   
                 <div v-if="chimeCallSettings && !chimeCallSettings.callCamStatus" class="tooltip-wrapper bg-white/70 flex justify-center absolute top-[-70px] w-[34.0rem] rounded-xl px-3 py-2
-                    after:content-[''] after:absolute after:bottom-[-1.5rem] after:left-1/2 after:-translate-x-1/2
+                    after:content-[''] after:absolute after:bottom-[-1.6rem] after:left-1/2 after:-translate-x-1/2
                     after:border-8 after:border-transparent after:border-t-white/70"
                 >
                     <div class="always-visible-tooltip text-[#101828] text-center font-poppins text-[1.2rem] font-medium leading-[1.8rem]" >

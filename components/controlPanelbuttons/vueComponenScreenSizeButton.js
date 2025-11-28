@@ -37,13 +37,14 @@
     template: `
       <div
         data-toggle-screensize
-        class="w-12 lg:w-17 h-12 lg:h-17 rounded-full bg-white/10 hidden sm:flex lg:flex items-center justify-center cursor-pointer shadow-[0_0_8px_0_rgba(0,0,0,0.25)]"
+        :class="['w-12 lg:w-17 h-12 lg:h-17 rounded-full hidden sm:flex lg:flex items-center justify-center cursor-pointer shadow-[0_0_8px_0_rgba(0,0,0,0.25)]'
+          , isFullscreen ? 'bg-white/75' : 'bg-white/5']"
         role="button"
         aria-label="Toggle fullscreen"
         @click="handleToggle"
       >
         <img v-show="isFullscreen"
-          src="'https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/minimize-02.svg"
+          src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/maximize-02.svg"
           class="w-[2.2rem] lg:w-8 h-[2.2rem] lg:h-8"
           alt="Exit fullscreen"
         />

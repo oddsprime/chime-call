@@ -25,7 +25,7 @@
         >
           <div class="flex items-center gap-2">
             <img src="assets/background-drop-icon.svg" alt="icon" />
-            <span class="text-white lg:text-base text-sm font-medium">Backgrounds &amp; Effects</span>
+            <h2 class="text-white lg:text-base text-sm font-medium">Backgrounds &amp; Effects</h2>
           </div>
           <img
             src="assets/chevron-down-white.svg"

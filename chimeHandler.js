@@ -2887,7 +2887,7 @@ class chimeHandler {
         template: `
           <div class="absolute w-[12.0rem] h-[12.1rem] z-1 flex justify-center items-center">
           </div>
-          <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
+          <div class="flex w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
             <DefaultAvatar
               :src="avatarSrc"
               :initial="userInitials"

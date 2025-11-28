@@ -39,7 +39,7 @@ const ChatSidebar = defineComponent({
                   <img  @click="toggleChat" @click="setActivePanel(null);" src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/x.svg" class="w-6 h-6 object-cover lg:hidden flex cursor-pointer">
                 </div>
                 <!-- Chat Messages -->
-                <div id="chat-messages" class="mt-4 max-h-[79.6vh] overflow-y-auto no-scrollbar" data-chat-messages-global="">
+                <div id="chat-messages" class="mt-4 max-h-[85.6vh] lg:max-h-[84vh] overflow-y-auto no-scrollbar" data-chat-messages-global="">
                   <!-- Messages will be populated here -->
                 </div>
               </div>
@@ -77,23 +77,23 @@ const ChatSidebar = defineComponent({
                   <div id="plusMenuPopup" class="hidden absolute lg:right-2 lg:bottom-[65px] lg:w-[294px] rounded-t-[10px] lg:rounded-none flex flex-col  bottom-[65px] lg:rounded-10 left-0 lg:left-auto bg-[#00000040] w-full overflow-hidden lg:bg-black/80 backdrop-blur-md">
                     <div @click="setActivePanel('mediaCards')" class="flex items-center gap-2 px-4 py-[10px] cursor-pointer" data-toggle-media-cards-panel id="attachMediaBtn">
                       <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/image-plus.svg" class="object-cover" alt="Plus icon">
-                      <p class="text-white font-medium text-base">Attach media...</p>
+                      <p class="text-white font-medium text-base">Attach Media</p>
                     </div>
                     <div @click="setActivePanel('merchCards')" class="flex items-center gap-2 px-4 py-[10px]">
                       <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/package-plus.svg" class="object-cover" alt="Plus icon">
                       <p class="text-white font-medium text-base">
-                        Attach product...
+                        Attach Product
                       </p>
                     </div>
                     <div @click="setActivePanel('subscriptionCards')" class="flex items-center gap-2 px-4 py-[10px]">
                       <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/logo_bg.svg" class="object-cover" alt="Plus icon">
                       <p class="text-white font-medium text-base">
-                        Attach Subscription plan...
+                        Attach Subscription Plan
                       </p>
                     </div>
                     <div @click="setActivePanel('callSettings')" class="flex border-t border-t-[#FFFFFF40] items-center gap-2 px-4 py-[10px]">
                       <img src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/settings-02.svg" class="object-cover" alt="Plus icon">
-                      <p class="text-white font-medium text-base">Chat setting</p>
+                      <p class="text-white font-medium text-base">Chat Settings</p>
                     </div>
                   </div>
                 </div>

@@ -54,7 +54,7 @@
         />
       </div>
 
-      <div class="pb-20 pt-8 lg:pb-0 lg:pt-0 mobile-landscape:pb-0 flex flex-col gap-2 md:!gap-0 h-full overflow-scroll">
+      <div class="pb-20 pt-8 lg:pt-0 mobile-landscape:pb-0 flex flex-col gap-2 md:!gap-0 h-full overflow-scroll">
         <settings-audio-video />
         <settings-backgrounds-effects :chime-call-settings="chimeCallSettings" />
       </div><!-- Chat Setting Section -->
