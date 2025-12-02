@@ -414,7 +414,7 @@ class chimeHandler {
       
       // Show alert with rejoin option (only for unexpected disconnections)
       const shouldRejoin = confirm(
-        "❌ Disconnected from meeting\n\n" +
+        "âŒ Disconnected from meeting\n\n" +
         "Reason: " + reason + "\n\n" +
         "Would you like to rejoin the meeting?"
       );
@@ -460,7 +460,7 @@ class chimeHandler {
               "coreChime:disconnected",
               "Reconnected to meeting!"
             );
-            alert("✅ Reconnected to meeting!");
+            alert("âœ… Reconnected to meeting!");
           } catch (err) {
             console.error("[chimeHandler] Rejoin failed:", err);
             DebugLogger.addLog(
@@ -469,7 +469,7 @@ class chimeHandler {
               "coreChime:disconnected",
               "Failed to rejoin meeting: " + err.message
             );
-            alert("❌ Failed to rejoin meeting: " + err.message);
+            alert("âŒ Failed to rejoin meeting: " + err.message);
           }
         }, 1000);
       } else {
@@ -481,7 +481,7 @@ class chimeHandler {
           "Disconnected from meeting",
           { reason }
         );
-        alert("❌ Disconnected from meeting\n\nReason: " + reason);
+        alert("âŒ Disconnected from meeting\n\nReason: " + reason);
         
         // Dispatch disconnected state
         try {
@@ -530,11 +530,11 @@ class chimeHandler {
       if (attendeeId !== myAttendeeId && !this._hasShownInCallAlert) {
         // This is a remote participant joining
         // In one-on-one calls, when we receive this event for a remote participant, both are joined
-        console.log("[chimeHandler] 🎉 Remote participant joined - call is now active!");
+        console.log("[chimeHandler] ðŸŽ‰ Remote participant joined - call is now active!");
         this._hasShownInCallAlert = true;
         
         // Show alert to both users
-        alert("✅ Call started! Both participants are connected - your timer will begin shortly.");
+        alert("âœ… Call started! Both participants are connected - your timer will begin shortly.");
         
         // Dispatch shared:inCall state
         if (typeof CallHandler !== "undefined" && CallHandler.dipatchUI) {
@@ -566,7 +566,7 @@ class chimeHandler {
             detail: callData
           }));
           
-          console.log("[chimeHandler] ✅ Dispatched shared:inCall and callTimerPaymentFlows", callData);
+          console.log("[chimeHandler] âœ… Dispatched shared:inCall and callTimerPaymentFlows", callData);
         }
       }
 
@@ -574,7 +574,7 @@ class chimeHandler {
       // This ensures the new join gets our info right away
       if (myAttendeeId && myExternalUserId) {
         console.log(
-          "[chimeHandler] 📤 Sending mapping packet to newly joined attendee",
+          "[chimeHandler] ðŸ“¤ Sending mapping packet to newly joined attendee",
           { newAttendeeId: attendeeId.substring(0, 8), newExternalUserId: externalUserId }
         );
         
@@ -630,7 +630,7 @@ class chimeHandler {
         container.classList.add('hidden');
         container.classList.remove('active');
         
-        console.log(`[chimeHandler] ✅ Container hidden for disconnected attendee`);
+        console.log(`[chimeHandler] âœ… Container hidden for disconnected attendee`);
       }
       
       // Clean up attendee state
@@ -656,12 +656,12 @@ class chimeHandler {
       
       // Log to DebugLogger
       if (typeof DebugLogger !== "undefined") {
-        DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler.tile-updated', `Tile Update: ${isLocal ? '📹 LOCAL' : '🎥 REMOTE'}`, {
+        DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler.tile-updated', `Tile Update: ${isLocal ? 'ðŸ“¹ LOCAL' : 'ðŸŽ¥ REMOTE'}`, {
           tileId,
           attendeeId: boundAttendeeId,
           hasStream,
           active,
-          videoStatus: (hasStream && active) ? '✅ ON' : '❌ OFF'
+          videoStatus: (hasStream && active) ? 'âœ… ON' : 'âŒ OFF'
         });
       }
 
@@ -676,7 +676,7 @@ class chimeHandler {
       // (active is about tile display, hasStream is about video feed)
       if (boundAttendeeId) {
         const videoIsActuallyOn = hasStream; // Stream = video ON, no stream = video OFF
-        console.log(`[chimeHandler] Tile ${tileId} for ${boundAttendeeId}: hasStream=${hasStream}, active=${active} → Video ${videoIsActuallyOn ? 'ON' : 'OFF'}`);
+        console.log(`[chimeHandler] Tile ${tileId} for ${boundAttendeeId}: hasStream=${hasStream}, active=${active} â†’ Video ${videoIsActuallyOn ? 'ON' : 'OFF'}`);
         
         // REMOVED: Automatic UI state transition on video stream appearing
         // Video toggle should NEVER change UI state - state is controlled by user actions only
@@ -693,7 +693,7 @@ class chimeHandler {
         
         // Clean up any stale pending toggles for remote users (shouldn't exist, but safety check)
         if (!isLocal && pending) {
-          console.log(`%c[VIDEO TOGGLE] 🧹 Cleaning up stale pending toggle for remote user ${boundAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 3px;');
+          console.log(`%c[VIDEO TOGGLE] ðŸ§¹ Cleaning up stale pending toggle for remote user ${boundAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 3px;');
           if (pending.pollInterval) clearInterval(pending.pollInterval);
           if (pending.showSpinnerTimeout) clearTimeout(pending.showSpinnerTimeout);
           if (pending.timeout) clearTimeout(pending.timeout);
@@ -704,7 +704,7 @@ class chimeHandler {
         // Only process spinner logic for local user
         if (isLocal && pending && pending.expected === true && videoIsActuallyOn && hasStream) {
           // Video is ON and stream is present - use Method 7 (Polling) to detect when feed is ready
-          console.log(`%c[VIDEO TOGGLE] 🎥 Video stream detected - starting Method 7 (Polling) for LOCAL ${boundAttendeeId.substring(0,8)}...`, 'background: #007bff; color: white; font-weight: bold; padding: 5px;');
+          console.log(`%c[VIDEO TOGGLE] ðŸŽ¥ Video stream detected - starting Method 7 (Polling) for LOCAL ${boundAttendeeId.substring(0,8)}...`, 'background: #007bff; color: white; font-weight: bold; padding: 5px;');
           
           // Find the video element
           const container = document.querySelector(`[data-attendee-id="${boundAttendeeId}"]`);
@@ -732,7 +732,7 @@ class chimeHandler {
               if (isReady) {
                 clearInterval(pending.pollInterval);
                 const duration = Date.now() - pending.timestamp;
-                console.log(`%c[VIDEO TOGGLE] ✅ Method 7 (Polling) - Video feed ready in ${duration}ms (${pollCount} polls)`, 'background: #28a745; color: white; font-weight: bold; padding: 5px;', {
+                console.log(`%c[VIDEO TOGGLE] âœ… Method 7 (Polling) - Video feed ready in ${duration}ms (${pollCount} polls)`, 'background: #28a745; color: white; font-weight: bold; padding: 5px;', {
                   readyState: videoElement.readyState,
                   videoWidth: videoElement.videoWidth,
                   videoHeight: videoElement.videoHeight,
@@ -766,13 +766,13 @@ class chimeHandler {
               
               if (pollCount >= maxPolls) {
                 clearInterval(pending.pollInterval);
-                console.warn(`%c[VIDEO TOGGLE] ⏱️ Polling timeout after ${maxPolls} attempts (${maxPolls/10}s${hasEffects ? ' - effects active' : ''})`, 'background: #f00; color: #fff; padding: 5px;');
+                console.warn(`%c[VIDEO TOGGLE] â±ï¸ Polling timeout after ${maxPolls} attempts (${maxPolls/10}s${hasEffects ? ' - effects active' : ''})`, 'background: #f00; color: #fff; padding: 5px;');
                 this._hideLoadingOverlay(boundAttendeeId);
                 delete this._pendingVideoToggles[boundAttendeeId];
               }
             }, 100); // Poll every 100ms
           } else {
-            console.warn(`%c[VIDEO TOGGLE] ⚠️ Video element not found for ${boundAttendeeId.substring(0,8)}...`, 'background: #ffc107; color: black; padding: 5px;');
+            console.warn(`%c[VIDEO TOGGLE] âš ï¸ Video element not found for ${boundAttendeeId.substring(0,8)}...`, 'background: #ffc107; color: black; padding: 5px;');
           }
         }
         
@@ -931,7 +931,7 @@ class chimeHandler {
         if (existingVideo && hasStream) {
           // Video element exists and we have a stream - REBIND it!
           console.log(
-            `[chimeHandler] ✅ Video element exists for ${boundAttendeeId} with stream - REBINDING to tile ${tileId}`
+            `[chimeHandler] âœ… Video element exists for ${boundAttendeeId} with stream - REBINDING to tile ${tileId}`
           );
           
           if (typeof DebugLogger !== "undefined") {
@@ -947,7 +947,7 @@ class chimeHandler {
           
           // REBIND to Chime tile
           coreChime.bindVideoElement(tileId, existingVideo);
-          console.log(`[chimeHandler] ✅ Rebound video element to tile ${tileId}`);
+          console.log(`[chimeHandler] âœ… Rebound video element to tile ${tileId}`);
           
           // Force video element to play (in case it was paused)
           if (existingVideo.paused) {
@@ -958,7 +958,7 @@ class chimeHandler {
           setTimeout(() => {
             const hasVideoTrack = existingVideo.srcObject && existingVideo.srcObject.getVideoTracks().length > 0;
             const isPlaying = !existingVideo.paused && existingVideo.currentTime > 0;
-            console.log(`[chimeHandler] 🔍 Video diagnostic for tile ${tileId}:`, {
+            console.log(`[chimeHandler] ðŸ” Video diagnostic for tile ${tileId}:`, {
               hasVideoTrack,
               isPlaying,
               readyState: existingVideo.readyState,
@@ -972,19 +972,19 @@ class chimeHandler {
                 isPlaying,
                 readyState: existingVideo.readyState,
                 dimensions: `${existingVideo.videoWidth}x${existingVideo.videoHeight}`,
-                warning: !hasVideoTrack ? "⚠️ NO VIDEO TRACK!" : (isPlaying ? "✅ Playing" : "⚠️ Not playing")
+                warning: !hasVideoTrack ? "âš ï¸ NO VIDEO TRACK!" : (isPlaying ? "âœ… Playing" : "âš ï¸ Not playing")
               });
             }
             
             // If no stream after 1 second, try forcing a re-bind
             if (!hasVideoTrack) {
-              console.warn(`[chimeHandler] ⚠️ Video element has no stream after rebind - forcing re-bind...`);
+              console.warn(`[chimeHandler] âš ï¸ Video element has no stream after rebind - forcing re-bind...`);
               coreChime.bindVideoElement(tileId, existingVideo);
               
               // Check again after another second
               setTimeout(() => {
                 const stillNoTrack = !existingVideo.srcObject || existingVideo.srcObject.getVideoTracks().length === 0;
-                console.log(`[chimeHandler] 🔍 After force re-bind:`, {
+                console.log(`[chimeHandler] ðŸ” After force re-bind:`, {
                   hasVideoTrack: !stillNoTrack,
                   videoWidth: existingVideo.videoWidth,
                   videoHeight: existingVideo.videoHeight
@@ -994,7 +994,7 @@ class chimeHandler {
                   DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._checkVideoStreamAfterDelay', `Force Re-bind Result: ${boundAttendeeId.substring(0,8)}...`, {
                     success: !stillNoTrack,
                     dimensions: `${existingVideo.videoWidth}x${existingVideo.videoHeight}`,
-                    warning: stillNoTrack ? "❌ STILL NO STREAM - SDK ISSUE!" : "✅ Re-bind worked!"
+                    warning: stillNoTrack ? "âŒ STILL NO STREAM - SDK ISSUE!" : "âœ… Re-bind worked!"
                   });
                 }
               }, 1000);
@@ -1014,7 +1014,7 @@ class chimeHandler {
         // Check if attendee is already tracked (but no video element found - shouldn't happen)
         if (this._attendeesWithVideos.has(boundAttendeeId)) {
           console.log(
-            `[chimeHandler] ⚠️ Attendee ${boundAttendeeId} tracked but no video element found - will recreate`
+            `[chimeHandler] âš ï¸ Attendee ${boundAttendeeId} tracked but no video element found - will recreate`
           );
           this._attendeesWithVideos.delete(boundAttendeeId);
         }
@@ -1129,7 +1129,7 @@ class chimeHandler {
           }
 
           console.log(
-            `[chimeHandler] ✅ Created video + overlays for ${container.id} - attendee ${boundAttendeeId.substring(0,8)}... hasStream=${hasStream}`
+            `[chimeHandler] âœ… Created video + overlays for ${container.id} - attendee ${boundAttendeeId.substring(0,8)}... hasStream=${hasStream}`
           );
 
           // For local videos, call UiMapTileToCard to properly map to container
@@ -1223,7 +1223,7 @@ class chimeHandler {
               if (window.ChimeSettingsUtility) {
                 window.ChimeSettingsUtility.setAttendeeState(boundAttendeeId, { 
                 videoEnabled: hasStream, 
-                  audioEnabled: currentState.audioEnabled !== undefined ? currentState.audioEnabled : false // ✅ FIX: Default to false, not true
+                  audioEnabled: currentState.audioEnabled !== undefined ? currentState.audioEnabled : false // âœ… FIX: Default to false, not true
               });
               }
               const newState = window.ChimeSettingsUtility?.getAttendeeState(boundAttendeeId);
@@ -1251,7 +1251,7 @@ class chimeHandler {
                 this.showHideStatusIcons(container, boundAttendeeId, true);
               }
 
-              console.log(`[chimeHandler] ✅ All overlays created for ${boundAttendeeId.substring(0,8)}... (awaiting mapping)`);
+              console.log(`[chimeHandler] âœ… All overlays created for ${boundAttendeeId.substring(0,8)}... (awaiting mapping)`);
             }
           }
         }
@@ -1298,7 +1298,7 @@ class chimeHandler {
           // Hide any loading overlay
           this._hideLoadingOverlay(attendeeId);
           delete this._pendingVideoToggles[attendeeId];
-          console.log(`[chimeHandler] ✅ Cleared pending toggle state`);
+          console.log(`[chimeHandler] âœ… Cleared pending toggle state`);
         }
         
         // Unbind from Chime
@@ -1315,7 +1315,7 @@ class chimeHandler {
         
         // Remove the video element
         video.remove();
-        console.log("[chimeHandler] ✅ Cleaned up video for tile", tileId);
+        console.log("[chimeHandler] âœ… Cleaned up video for tile", tileId);
       }
     });
     
@@ -1371,18 +1371,18 @@ class chimeHandler {
         // Update Vue settings
         if (window.vueApp && window.vueApp.ChimeCallSettings) {
           window.vueApp.ChimeCallSettings.callSettings.selectedVideoDevice = deviceId;
-          console.log("[chimeHandler] [_wireDeviceSelectorEvents] ✅ Vue settings updated");
+          console.log("[chimeHandler] [_wireDeviceSelectorEvents] âœ… Vue settings updated");
         } else {
-          console.warn("[chimeHandler] [_wireDeviceSelectorEvents] ⚠️ Vue app not available");
+          console.warn("[chimeHandler] [_wireDeviceSelectorEvents] âš ï¸ Vue app not available");
         }
         
         // Dispatch to Chime if in call
         if (typeof coreChime !== "undefined" && coreChime._audioVideo) {
           console.log("[chimeHandler] [_wireDeviceSelectorEvents] In Chime call - dispatching to coreChime.changeVideoInputDevice");
           coreChime.changeVideoInputDevice(deviceId).then(() => {
-            console.log("[chimeHandler] [_wireDeviceSelectorEvents] ✅ Video device changed successfully in Chime");
+            console.log("[chimeHandler] [_wireDeviceSelectorEvents] âœ… Video device changed successfully in Chime");
           }).catch((err) => {
-            console.error("[chimeHandler] [_wireDeviceSelectorEvents] ❌ Failed to change video device:", err);
+            console.error("[chimeHandler] [_wireDeviceSelectorEvents] âŒ Failed to change video device:", err);
           });
         } else {
           const hasCoreChime = typeof coreChime !== "undefined";
@@ -1404,18 +1404,18 @@ class chimeHandler {
         // Update Vue settings
         if (window.vueApp && window.vueApp.ChimeCallSettings) {
           window.vueApp.ChimeCallSettings.callSettings.selectedAudioDevice = deviceId;
-          console.log("[chimeHandler] [_wireDeviceSelectorEvents] ✅ Vue settings updated");
+          console.log("[chimeHandler] [_wireDeviceSelectorEvents] âœ… Vue settings updated");
         } else {
-          console.warn("[chimeHandler] [_wireDeviceSelectorEvents] ⚠️ Vue app not available");
+          console.warn("[chimeHandler] [_wireDeviceSelectorEvents] âš ï¸ Vue app not available");
         }
         
         // Dispatch to Chime if in call
         if (typeof coreChime !== "undefined" && coreChime._audioVideo) {
           console.log("[chimeHandler] [_wireDeviceSelectorEvents] In Chime call - dispatching to coreChime.changeAudioInputDevice");
           coreChime.changeAudioInputDevice(deviceId).then(() => {
-            console.log("[chimeHandler] [_wireDeviceSelectorEvents] ✅ Audio device changed successfully in Chime");
+            console.log("[chimeHandler] [_wireDeviceSelectorEvents] âœ… Audio device changed successfully in Chime");
           }).catch((err) => {
-            console.error("[chimeHandler] [_wireDeviceSelectorEvents] ❌ Failed to change audio device:", err);
+            console.error("[chimeHandler] [_wireDeviceSelectorEvents] âŒ Failed to change audio device:", err);
           });
         } else {
           const hasCoreChime = typeof coreChime !== "undefined";
@@ -1542,7 +1542,7 @@ class chimeHandler {
         }
         // Settings are already set correctly from user's preference, no need to reset
         
-        console.log("[chimeHandler] ✅ Joined successfully with user's preferred settings");
+        console.log("[chimeHandler] âœ… Joined successfully with user's preferred settings");
       } catch (error) {
         console.error("[chimeHandler] Error joining Chime meeting:", error);
       }
@@ -1659,7 +1659,7 @@ class chimeHandler {
           : (!needCamera && needMicrophone ? "audioOnlyCall" : "videoOnlyCall");
       } catch (_) {}
 
-      // ❌ DISABLED - CallHandler manages permission UI state, not chimeHandler
+      // âŒ DISABLED - CallHandler manages permission UI state, not chimeHandler
       // Tell Vue to show the permission screen
       // try {
       //   if (typeof CallHandler !== "undefined" && CallHandler.dipatchUI) {
@@ -1821,12 +1821,12 @@ class chimeHandler {
    * Force Media Controls Off/On (for audio-only calls and grace period)
    * ==================================================================== */
   static async forceControlsOff() {
-    console.log("[chimeHandler] [forceControlsOff] ⏸️ GRACE PERIOD - Forcing audio/video OFF");
+    console.log("[chimeHandler] [forceControlsOff] â¸ï¸ GRACE PERIOD - Forcing audio/video OFF");
     
     // Disable video at SDK level
     if (coreChime && coreChime.toggleVideo) {
       coreChime.toggleVideo(false);
-      console.log("[chimeHandler] ✅ Video toggled OFF at SDK level");
+      console.log("[chimeHandler] âœ… Video toggled OFF at SDK level");
     }
     
     // CRITICAL: Stop audio input stream completely (not just mute)
@@ -1837,14 +1837,14 @@ class chimeHandler {
         // Stop the audio input device (this actually stops transmission)
         if (typeof coreChime._audioVideo.stopAudioInput === 'function') {
           await coreChime._audioVideo.stopAudioInput();
-          console.log("[chimeHandler] ✅ Audio input stream STOPPED (transmission halted)");
+          console.log("[chimeHandler] âœ… Audio input stream STOPPED (transmission halted)");
         } else {
           // Fallback to mute if stopAudioInput doesn't exist
           coreChime._audioVideo.realtimeMuteLocalAudio();
-          console.log("[chimeHandler] ⚠️ Fallback: Audio muted (stopAudioInput not available)");
+          console.log("[chimeHandler] âš ï¸ Fallback: Audio muted (stopAudioInput not available)");
         }
       } catch (error) {
-        console.error("[chimeHandler] ❌ Error stopping audio input:", error);
+        console.error("[chimeHandler] âŒ Error stopping audio input:", error);
       }
     }
     
@@ -1872,11 +1872,11 @@ class chimeHandler {
       this._updateVideoOffIndicatorForGrace(localIds.attendeeId, true);
     }
     
-    console.log("[chimeHandler] ✅ Media controls forced OFF (Audio stream STOPPED + Video OFF)");
+    console.log("[chimeHandler] âœ… Media controls forced OFF (Audio stream STOPPED + Video OFF)");
   }
 
   static async forceControlsOn() {
-    console.log("[chimeHandler] [forceControlsOn] ▶️ RESUMING - Re-enabling audio");
+    console.log("[chimeHandler] [forceControlsOn] â–¶ï¸ RESUMING - Re-enabling audio");
     
     // CRITICAL: Restart audio input stream
     if (coreChime && coreChime._audioVideo) {
@@ -1892,18 +1892,18 @@ class chimeHandler {
           // Restart audio input
           if (typeof coreChime._audioVideo.chooseAudioInputDevice === 'function') {
             await coreChime._audioVideo.chooseAudioInputDevice(preferredMic);
-            console.log("[chimeHandler] ✅ Audio input restarted:", preferredMic);
+            console.log("[chimeHandler] âœ… Audio input restarted:", preferredMic);
           } else if (typeof coreChime._audioVideo.startAudioInput === 'function') {
             await coreChime._audioVideo.startAudioInput(preferredMic);
-            console.log("[chimeHandler] ✅ Audio input restarted (old API):", preferredMic);
+            console.log("[chimeHandler] âœ… Audio input restarted (old API):", preferredMic);
           }
           
           // Unmute after restarting
           coreChime._audioVideo.realtimeUnmuteLocalAudio();
-          console.log("[chimeHandler] ✅ Audio unmuted");
+          console.log("[chimeHandler] âœ… Audio unmuted");
         }
       } catch (error) {
-        console.error("[chimeHandler] ❌ Error restarting audio input:", error);
+        console.error("[chimeHandler] âŒ Error restarting audio input:", error);
       }
     }
     
@@ -1931,7 +1931,7 @@ class chimeHandler {
       this._updateVideoOffIndicatorForGrace(localIds.attendeeId, false);
     }
     
-    console.log("[chimeHandler] ✅ Audio re-enabled (Stream restarted + Unmuted)");
+    console.log("[chimeHandler] âœ… Audio re-enabled (Stream restarted + Unmuted)");
   }
 
   /* ====================================================================
@@ -1993,7 +1993,7 @@ class chimeHandler {
       console.log("[chimeHandler] Video toggle blocked: audio-only call");
       DebugLogger.addLog("connected", "NOTICE", "handleVideoToggle", 
         "Video toggle blocked during audio-only call");
-      alert("❌ Video is not available in audio-only calls");
+      alert("âŒ Video is not available in audio-only calls");
       return;
     }
 
@@ -2018,7 +2018,7 @@ class chimeHandler {
           const hasEffects = settings.blurEnabled || settings.backgroundImageUrl;
           if (hasEffects) {
             spinnerTimeout = 6000; // Add 1 extra second for effects processing
-            console.log(`%c[VIDEO TOGGLE] ⏱️ Extended spinner timeout to 6s (blur/background active)`, 'background: #ff0; color: #000');
+            console.log(`%c[VIDEO TOGGLE] â±ï¸ Extended spinner timeout to 6s (blur/background active)`, 'background: #ff0; color: #000');
           }
         }
         
@@ -2030,7 +2030,7 @@ class chimeHandler {
           timeout: setTimeout(() => {
             const pending = this._pendingVideoToggles[localAttendeeId];
             if (pending) {
-              console.warn(`%c[VIDEO TOGGLE] ⏱️ Timeout - hiding overlay after ${spinnerTimeout/1000}s for ${localAttendeeId.substring(0,8)}...`, 'background: #f00; color: #fff');
+              console.warn(`%c[VIDEO TOGGLE] â±ï¸ Timeout - hiding overlay after ${spinnerTimeout/1000}s for ${localAttendeeId.substring(0,8)}...`, 'background: #f00; color: #fff');
               // Clear polling if still running
               if (pending.pollInterval) {
                 clearInterval(pending.pollInterval);
@@ -2054,7 +2054,7 @@ class chimeHandler {
           // Clear polling interval if it exists
           if (this._pendingVideoToggles[localAttendeeId].pollInterval) {
             clearInterval(this._pendingVideoToggles[localAttendeeId].pollInterval);
-            console.log(`%c[VIDEO TOGGLE] 🧹 Cleared polling interval for ${localAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 5px;');
+            console.log(`%c[VIDEO TOGGLE] ðŸ§¹ Cleared polling interval for ${localAttendeeId.substring(0,8)}...`, 'background: #6c757d; color: white; padding: 5px;');
           }
           this._hideLoadingOverlay(localAttendeeId);
           delete this._pendingVideoToggles[localAttendeeId];
@@ -2133,7 +2133,7 @@ class chimeHandler {
       // Update UI overlays (same as video toggle)
       this._updateDebugOverlay(localIds.attendeeId, { audioEnabled: on });
       this._updateStatusIcons(localIds.attendeeId, { audioEnabled: on }); // Update mic icon
-      console.log(`%c[AUDIO TOGGLE] ✅ Updated local audio status: ${on ? 'ON' : 'OFF'}`, 'background: #0f0; color: #000');
+      console.log(`%c[AUDIO TOGGLE] âœ… Updated local audio status: ${on ? 'ON' : 'OFF'}`, 'background: #0f0; color: #000');
       
       // Broadcast audio state change to all participants
       this._broadcastVideoState();
@@ -2172,7 +2172,7 @@ class chimeHandler {
           "connected",
           "NOTICE",
           "handleDataSend",
-          `Reaction sent: ${payload.emoji || "👍"}`
+          `Reaction sent: ${payload.emoji || "ðŸ‘"}`
         );
         break;
       case "tip":
@@ -2216,7 +2216,7 @@ class chimeHandler {
       );
       
       if (isTerminated) {
-        console.log(`%c[GUARD] 🚫 Blocked Chime data message - call terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
+        console.log(`%c[GUARD] ðŸš« Blocked Chime data message - call terminated`, 'background: #dc3545; color: white; font-weight: bold; padding: 5px;', {
           flag,
           isCallTerminated: CallHandler._isCallTerminated,
           currentState: CallHandler._currentUIState,
@@ -2233,7 +2233,7 @@ class chimeHandler {
         return; // Block the message
       }
       
-      console.log(`%c[GUARD] ✅ Allowing Chime data message`, 'background: #28a745; color: white; padding: 3px;', {
+      console.log(`%c[GUARD] âœ… Allowing Chime data message`, 'background: #28a745; color: white; padding: 3px;', {
         flag,
         currentState: CallHandler._currentUIState
       });
@@ -2317,7 +2317,7 @@ class chimeHandler {
       this._updateVideoOffIndicator(attendeeId, videoEnabled);
       this._updateDebugOverlay(attendeeId, { videoEnabled });
       this._updateStatusIcons(attendeeId, { videoEnabled }); // Update status icons
-      console.log(`[chimeHandler] ✅ Updated remote video status: ${videoEnabled ? 'ON' : 'OFF'} for ${attendeeId} (no spinner - instant transition)`);
+      console.log(`[chimeHandler] âœ… Updated remote video status: ${videoEnabled ? 'ON' : 'OFF'} for ${attendeeId} (no spinner - instant transition)`);
     }
   }
   
@@ -2345,14 +2345,14 @@ class chimeHandler {
       
       this._updateDebugOverlay(attendeeId, { audioEnabled });
       this._updateStatusIcons(attendeeId, { audioEnabled }); // Update status icons
-      console.log(`[chimeHandler] ✅ Updated remote audio status: ${audioEnabled ? 'ON' : 'OFF'} for ${attendeeId}`);
+      console.log(`[chimeHandler] âœ… Updated remote audio status: ${audioEnabled ? 'ON' : 'OFF'} for ${attendeeId}`);
     }
   }
   
   /* ====================================================================
    * handleIncomingMapping - ONE-ON-ONE Call Logic
    * 
-   * 🔴 IMPORTANT: This handles ONE-ON-ONE instant calls only
+   * ðŸ”´ IMPORTANT: This handles ONE-ON-ONE instant calls only
    * 
    * For ONE-ON-ONE calls:
    * - Host sees Attendee
@@ -2452,7 +2452,7 @@ class chimeHandler {
           "connected",
           "NOTICE",
           "_broadcastVideoState",
-          `📤 Dispatched Video State`,
+          `ðŸ“¤ Dispatched Video State`,
           {
             attendeeId: myAttendeeId,
             videoEnabled: myState.videoEnabled,
@@ -2470,7 +2470,7 @@ class chimeHandler {
       this._updateDebugOverlay(myAttendeeId, myState);
       this._updateVideoOffIndicator(myAttendeeId, myState.videoEnabled);
       
-      console.log(`[_broadcastVideoState] ✅ Synced local visual indicators for ${myAttendeeId.substring(0, 8)}...`);
+      console.log(`[_broadcastVideoState] âœ… Synced local visual indicators for ${myAttendeeId.substring(0, 8)}...`);
       
     } catch (error) {
       console.error("[_broadcastVideoState] Error:", error);
@@ -2497,7 +2497,7 @@ class chimeHandler {
           "connected",
           "NOTICE",
           "handleIncomingVideoState",
-          `📥 Received Video State from ${attendeeId.substring(0, 8)}...`,
+          `ðŸ“¥ Received Video State from ${attendeeId.substring(0, 8)}...`,
           {
             fromAttendeeId: attendeeId,
             videoEnabled: payload.videoEnabled,
@@ -2518,7 +2518,7 @@ class chimeHandler {
         });
       }
       
-      console.log(`[handleIncomingVideoState] ✅ Synced remote state to settings for ${attendeeId.substring(0, 8)}...`);
+      console.log(`[handleIncomingVideoState] âœ… Synced remote state to settings for ${attendeeId.substring(0, 8)}...`);
       
       // Update UI components (they'll read from settings)
       this._updateStatusIcons(attendeeId, {
@@ -2535,7 +2535,7 @@ class chimeHandler {
       // Update video off indicator
       this._updateVideoOffIndicator(attendeeId, payload.videoEnabled);
       
-      console.log(`[handleIncomingVideoState] ✅ Synced visual indicators for ${attendeeId.substring(0, 8)}...`);
+      console.log(`[handleIncomingVideoState] âœ… Synced visual indicators for ${attendeeId.substring(0, 8)}...`);
       
     } catch (error) {
       console.error("[handleIncomingVideoState] Error:", error);
@@ -2544,7 +2544,7 @@ class chimeHandler {
 
 
   static handleIncomingReaction(payload, from) {
-    const emoji = payload.emoji || "❤️";
+    const emoji = payload.emoji || "â¤ï¸";
     const sender = from.externalUserId || "Unknown";
     
     DebugLogger.addLog(
@@ -2610,13 +2610,13 @@ class chimeHandler {
   }
 
   static handleIncomingChat(payload, from) {
-    console.log('[chimeHandler] 💬 Incoming chat message:', payload);
+    console.log('[chimeHandler] ðŸ’¬ Incoming chat message:', payload);
     
     DebugLogger.addLog(
       "connected",
       "NOTICE",
       "handleIncomingChat",
-      `📩 Chat received from ${from.externalUserId}: ${payload.message || payload.text}`
+      `ðŸ“© Chat received from ${from.externalUserId}: ${payload.message || payload.text}`
     );
 
     // Dispatch event for chatHandler to render the message
@@ -2631,7 +2631,7 @@ class chimeHandler {
   }
 
   static handleIncomingChatPromoBubble(payload, from) {
-    console.log('[chimeHandler] 🎁 Incoming chat promo:', payload);
+    console.log('[chimeHandler] ðŸŽ Incoming chat promo:', payload);
     
     DebugLogger.addLog(
       "connected",
@@ -2645,7 +2645,7 @@ class chimeHandler {
       window.dispatchEvent(new CustomEvent('ingest-cards', {
         detail: payload.cards
       }));
-      console.log('[chimeHandler] ✅ Chat promo cards dispatched for rendering');
+      console.log('[chimeHandler] âœ… Chat promo cards dispatched for rendering');
     }
   }
 
@@ -2887,7 +2887,7 @@ class chimeHandler {
         template: `
           <div class="absolute w-[12.0rem] h-[12.1rem] z-1 flex justify-center items-center">
           </div>
-          <div class="flex w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
+          <div class="lg:flex hidden w-16 h-16 flex-shrink-0 rounded-blob-1 aspect-square relative overflow-hidden w-9 h-9">
             <DefaultAvatar
               :src="avatarSrc"
               :initial="userInitials"
@@ -2919,7 +2919,7 @@ class chimeHandler {
         attendeeId: attendeeId
       });
       
-      console.log(`[_createVideoOffIndicator] ✅ Mounted Vue component with DefaultAvatar for ${attendeeId.substring(0, 8)}...`);
+      console.log(`[_createVideoOffIndicator] âœ… Mounted Vue component with DefaultAvatar for ${attendeeId.substring(0, 8)}...`);
     } else {
       // Fallback to innerHTML if Vue is not available
       console.warn(`[_createVideoOffIndicator] Vue or DefaultAvatar not available, using fallback innerHTML`);
@@ -2939,7 +2939,7 @@ class chimeHandler {
     }
 
     container.appendChild(indicator);
-    console.log(`[_createVideoOffIndicator] ✅ Created indicator for ${attendeeId.substring(0, 8)}... (visible by default - showing avatar)`);
+    console.log(`[_createVideoOffIndicator] âœ… Created indicator for ${attendeeId.substring(0, 8)}... (visible by default - showing avatar)`);
     
     if (typeof DebugLogger !== "undefined") {
       DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._createVideoOffIndicator', `Created Video OFF Indicator: ${attendeeId.substring(0,8)}...`, {
@@ -2976,12 +2976,12 @@ class chimeHandler {
           // Show grace period message, hide video off message
           videoOffMsg.style.display = 'none';
           graceMsg.style.display = 'block';
-          console.log(`[_updateVideoOffIndicatorForGrace] ✅ Showing GRACE PERIOD for ${attendeeId.substring(0,8)}...`);
+          console.log(`[_updateVideoOffIndicatorForGrace] âœ… Showing GRACE PERIOD for ${attendeeId.substring(0,8)}...`);
         } else {
           // Show video off message, hide grace period message
           videoOffMsg.style.display = 'block';
           graceMsg.style.display = 'none';
-          console.log(`[_updateVideoOffIndicatorForGrace] ✅ Showing VIDEO OFF for ${attendeeId.substring(0,8)}...`);
+          console.log(`[_updateVideoOffIndicatorForGrace] âœ… Showing VIDEO OFF for ${attendeeId.substring(0,8)}...`);
         }
       }
     });
@@ -3032,9 +3032,9 @@ class chimeHandler {
     }
     
     if (containers.length === 0) {
-      console.warn(`[_updateVideoOffIndicator] ❌ No containers found for ${attendeeId} (neither by attribute nor video element)`);
+      console.warn(`[_updateVideoOffIndicator] âŒ No containers found for ${attendeeId} (neither by attribute nor video element)`);
       if (typeof DebugLogger !== "undefined") {
-        DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `❌ NO CONTAINERS FOUND: ${attendeeId.substring(0,8)}...`, {
+        DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `âŒ NO CONTAINERS FOUND: ${attendeeId.substring(0,8)}...`, {
           attendeeId,
           triedAttribute: true,
           triedVideoElement: true,
@@ -3089,10 +3089,10 @@ class chimeHandler {
           // VIDEO ON - HIDE indicator IMMEDIATELY
           indicator.style.setProperty('display', 'none', 'important');
           indicator.style.setProperty('visibility', 'hidden', 'important');
-          console.log(`[_updateVideoOffIndicator] ✅ HIDING indicator (was: ${oldDisplay}, now: none)`);
+          console.log(`[_updateVideoOffIndicator] âœ… HIDING indicator (was: ${oldDisplay}, now: none)`);
           
           if (typeof DebugLogger !== "undefined") {
-            DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `✅ HIDING Video OFF: ${attendeeId.substring(0,8)}...`, {
+            DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `âœ… HIDING Video OFF: ${attendeeId.substring(0,8)}...`, {
               containerIndex: idx,
               videoEnabled: true,
               previousDisplay: oldDisplay
@@ -3103,10 +3103,10 @@ class chimeHandler {
           indicator.style.setProperty('display', 'flex', 'important');
           indicator.style.setProperty('visibility', 'visible', 'important');
           indicator.style.setProperty('z-index', '0', 'important');
-          console.log(`[_updateVideoOffIndicator] ✅ SHOWING indicator (was: ${oldDisplay}, now: flex)`);
+          console.log(`[_updateVideoOffIndicator] âœ… SHOWING indicator (was: ${oldDisplay}, now: flex)`);
           
           if (typeof DebugLogger !== "undefined") {
-            DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `✅ SHOWING Video OFF: ${attendeeId.substring(0,8)}...`, {
+            DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `âœ… SHOWING Video OFF: ${attendeeId.substring(0,8)}...`, {
               containerIndex: idx,
               oldDisplay,
               newDisplay: 'flex',
@@ -3116,9 +3116,9 @@ class chimeHandler {
           }
         }
       } else {
-        console.error(`[_updateVideoOffIndicator] ❌ Indicator still null after creation attempt!`);
+        console.error(`[_updateVideoOffIndicator] âŒ Indicator still null after creation attempt!`);
         if (typeof DebugLogger !== "undefined") {
-          DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `❌ INDICATOR NULL: ${attendeeId.substring(0,8)}...`, {
+          DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `âŒ INDICATOR NULL: ${attendeeId.substring(0,8)}...`, {
             containerIndex: idx,
             error: 'Indicator is null after creation'
           });
@@ -3132,26 +3132,26 @@ class chimeHandler {
           video.style.display = 'block';
           video.style.visibility = 'visible';
           video.style.opacity = '1';
-          console.log(`[_updateVideoOffIndicator] ✅ SHOWING video element (indicator will hide when 'playing' event fires)`);
+          console.log(`[_updateVideoOffIndicator] âœ… SHOWING video element (indicator will hide when 'playing' event fires)`);
         } else {
           video.style.display = 'none';
           video.style.visibility = 'hidden';
           video.style.opacity = '0';
-          console.log(`[_updateVideoOffIndicator] ✅ HIDING video element`);
+          console.log(`[_updateVideoOffIndicator] âœ… HIDING video element`);
         }
       }
     });
     
-    console.log(`[_updateVideoOffIndicator] ✅ COMPLETE: Processed ${processedCount} of ${containers.length} containers (skipped ${containers.length - processedCount} ghost containers)`);
+    console.log(`[_updateVideoOffIndicator] âœ… COMPLETE: Processed ${processedCount} of ${containers.length} containers (skipped ${containers.length - processedCount} ghost containers)`);
     
     // Clean up ghost containers (containers with attendee ID but no video)
     // ONLY remove the attribute, DON'T hide/remove the container itself
     if (containers.length - processedCount > 0) {
-      console.warn(`[_updateVideoOffIndicator] 🧹 CLEANING UP ${containers.length - processedCount} ghost container attributes...`);
+      console.warn(`[_updateVideoOffIndicator] ðŸ§¹ CLEANING UP ${containers.length - processedCount} ghost container attributes...`);
       containers.forEach((container, idx) => {
         const hasVideo = container.querySelector('video');
         if (!hasVideo && container.getAttribute('data-attendee-id') === attendeeId) {
-          console.log(`[_updateVideoOffIndicator] 🗑️ Unlinking ghost container ${idx} (ID: ${container.id || 'none'}) - removing data-attendee-id only`);
+          console.log(`[_updateVideoOffIndicator] ðŸ—‘ï¸ Unlinking ghost container ${idx} (ID: ${container.id || 'none'}) - removing data-attendee-id only`);
           // ONLY remove the attendee ID attribute - container stays intact
           container.removeAttribute('data-attendee-id');
           // DON'T remove the indicator - it needs to stay visible until video element arrives
@@ -3162,7 +3162,7 @@ class chimeHandler {
     }
     
     if (typeof DebugLogger !== "undefined") {
-      DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `✅ Video OFF Update Complete: ${attendeeId.substring(0,8)}...`, {
+      DebugLogger.addLog('connected', 'NOTICE', 'chimeHandler._updateVideoOffIndicator', `âœ… Video OFF Update Complete: ${attendeeId.substring(0,8)}...`, {
         totalContainers: containers.length,
         processedContainers: processedCount,
         skippedGhosts: containers.length - processedCount,
@@ -3248,7 +3248,7 @@ class chimeHandler {
         document.head.appendChild(style);
       }
       
-      console.log(`[_showLoadingOverlay] ✅ Showing loading overlay for ${attendeeId.substring(0,8)}... - "${message}"`);
+      console.log(`[_showLoadingOverlay] âœ… Showing loading overlay for ${attendeeId.substring(0,8)}... - "${message}"`);
     });
   }
   
@@ -3262,7 +3262,7 @@ class chimeHandler {
       const overlay = container.querySelector('.loading-overlay');
       if (overlay) {
         overlay.remove();
-        console.log(`[_hideLoadingOverlay] ✅ Removed loading overlay for ${attendeeId.substring(0,8)}...`);
+        console.log(`[_hideLoadingOverlay] âœ… Removed loading overlay for ${attendeeId.substring(0,8)}...`);
       }
     });
     
@@ -3320,7 +3320,7 @@ class chimeHandler {
         attendeeId: attendeeId
       });
 
-      console.log(`[showHideStatusIcons] ✅ Mounted Vue component for ${attendeeId.substring(0, 8)}... (reads from settings)`);
+      console.log(`[showHideStatusIcons] âœ… Mounted Vue component for ${attendeeId.substring(0, 8)}... (reads from settings)`);
     }
     
     // Find the rendered status-icons div (inside wrapper)
@@ -3341,7 +3341,7 @@ class chimeHandler {
       
       if (show) {
         const state = window.ChimeSettingsUtility?.getAttendeeState(attendeeId) || { videoEnabled: false, audioEnabled: false };
-        console.log(`[showHideStatusIcons] ✅ Showing status icons for ${attendeeId.substring(0, 8)}...`, {
+        console.log(`[showHideStatusIcons] âœ… Showing status icons for ${attendeeId.substring(0, 8)}...`, {
       videoState: state.videoEnabled ? 'ON' : 'OFF',
           audioState: state.audioEnabled ? 'ON' : 'OFF',
           source: 'window.settings'
@@ -3375,7 +3375,7 @@ class chimeHandler {
         if (appData && appData.app) {
           try {
             appData.app.unmount();
-            console.log(`[_cleanupStatusIcons] ✅ Unmounted Vue app for ${wrapperAttendeeId?.substring(0, 8)}...`);
+            console.log(`[_cleanupStatusIcons] âœ… Unmounted Vue app for ${wrapperAttendeeId?.substring(0, 8)}...`);
           } catch (e) {
             console.warn(`[_cleanupStatusIcons] Error unmounting Vue app:`, e);
           }
@@ -3385,7 +3385,7 @@ class chimeHandler {
       
       // Remove wrapper from DOM
       wrapper.remove();
-      console.log(`[_cleanupStatusIcons] ✅ Removed status icons wrapper for ${wrapperAttendeeId?.substring(0, 8)}...`);
+      console.log(`[_cleanupStatusIcons] âœ… Removed status icons wrapper for ${wrapperAttendeeId?.substring(0, 8)}...`);
     }
   }
 
@@ -3412,7 +3412,7 @@ class chimeHandler {
         if (appData && appData.app) {
           try {
             appData.app.unmount();
-            console.log(`[_cleanupVideoOffIndicator] ✅ Unmounted Vue app for ${indicatorAttendeeId?.substring(0, 8)}...`);
+            console.log(`[_cleanupVideoOffIndicator] âœ… Unmounted Vue app for ${indicatorAttendeeId?.substring(0, 8)}...`);
           } catch (e) {
             console.warn(`[_cleanupVideoOffIndicator] Error unmounting Vue app:`, e);
           }
@@ -3422,7 +3422,7 @@ class chimeHandler {
       
       // Remove indicator from DOM
       indicator.remove();
-      console.log(`[_cleanupVideoOffIndicator] ✅ Removed video-off-indicator for ${indicatorAttendeeId?.substring(0, 8)}...`);
+      console.log(`[_cleanupVideoOffIndicator] âœ… Removed video-off-indicator for ${indicatorAttendeeId?.substring(0, 8)}...`);
     }
   }
 
@@ -3461,7 +3461,7 @@ class chimeHandler {
     });
     
     // State is already in window.settings - Vue component will auto-sync
-    console.log(`[_updateStatusIcons] ✅ Ensured status icons mounted for ${attendeeId.substring(0,8)}... in ${processedCount} container(s) - reading from settings:`, status);
+    console.log(`[_updateStatusIcons] âœ… Ensured status icons mounted for ${attendeeId.substring(0,8)}... in ${processedCount} container(s) - reading from settings:`, status);
   }
 
   /* ====================================================================
@@ -3551,9 +3551,9 @@ class chimeHandler {
       <div>ID: ${userId}</div>
       <div>Attendee: ${attendeeId.substring(0, 12)}...</div>
       <div>Tile: ${tileId}</div>
-      <div class="debug-audio">🔊 Audio: <span class="audio-status">Initializing...</span></div>
-      <div class="debug-video">📹 Video: <span class="video-status">Initializing...</span></div>
-      <div class="debug-connection">📶 Connection: <span class="connection-status">Connecting...</span></div>
+      <div class="debug-audio">ðŸ”Š Audio: <span class="audio-status">Initializing...</span></div>
+      <div class="debug-video">ðŸ“¹ Video: <span class="video-status">Initializing...</span></div>
+      <div class="debug-connection">ðŸ“¶ Connection: <span class="connection-status">Connecting...</span></div>
     `;
 
     container.appendChild(overlay);
@@ -3671,7 +3671,7 @@ class chimeHandler {
           this._findNextAvailableCollaboratorContainer();
         if (availableContainer) {
           console.log(
-            `[_findAvailableTileContainer] ✅ Found available ${availableContainer.id} for local collaborator`
+            `[_findAvailableTileContainer] âœ… Found available ${availableContainer.id} for local collaborator`
           );
           return availableContainer;
         }
@@ -3809,7 +3809,7 @@ class chimeHandler {
           this._findNextAvailableCollaboratorContainer();
         if (availableContainer) {
           console.log(
-            `[_findAvailableTileContainer] ✅ Found available ${availableContainer.id} for remote collaborator`
+            `[_findAvailableTileContainer] âœ… Found available ${availableContainer.id} for remote collaborator`
           );
           return availableContainer;
         }
@@ -3870,12 +3870,12 @@ class chimeHandler {
       // 2. No video element present
       if ((!currentAttendeeId || currentAttendeeId === "") && !hasVideo) {
         console.log(
-          `[_findNextAvailableCollaboratorContainer] ✅ Found truly empty collab${i}-container`
+          `[_findNextAvailableCollaboratorContainer] âœ… Found truly empty collab${i}-container`
         );
         return collabContainer;
       } else {
         console.log(
-          `[_findNextAvailableCollaboratorContainer] ❌ collab${i}-container is occupied by: ${currentAttendeeId} (hasVideo: ${!!hasVideo})`
+          `[_findNextAvailableCollaboratorContainer] âŒ collab${i}-container is occupied by: ${currentAttendeeId} (hasVideo: ${!!hasVideo})`
         );
       }
     }
@@ -3951,13 +3951,13 @@ class chimeHandler {
       existingContainer.getAttribute("data-attendee-id") !== ""
     ) {
       console.log(
-        `[UiMapTileToCard] ⚠️ Local video ${attendeeId} is already mapped to ${existingContainer.id}, ensuring visibility`
+        `[UiMapTileToCard] âš ï¸ Local video ${attendeeId} is already mapped to ${existingContainer.id}, ensuring visibility`
       );
       // Ensure the container is visible even if already mapped
       existingContainer.classList.remove("hidden");
       existingContainer.classList.add("active");
       console.log(
-        `[UiMapTileToCard] ✅ Made existing local video container visible: ${existingContainer.id}`
+        `[UiMapTileToCard] âœ… Made existing local video container visible: ${existingContainer.id}`
       );
       return;
     }
@@ -3970,7 +3970,7 @@ class chimeHandler {
       existingContainer.getAttribute("data-attendee-id") !== attendeeId
     ) {
       console.log(
-        `[UiMapTileToCard] ⚠️ Remote video ${attendeeId} is already mapped to different container ${existingContainer.id}, skipping duplicate mapping`
+        `[UiMapTileToCard] âš ï¸ Remote video ${attendeeId} is already mapped to different container ${existingContainer.id}, skipping duplicate mapping`
       );
       return;
     }
@@ -4017,13 +4017,13 @@ class chimeHandler {
               currentAttendeeId === attendeeId)
           ) {
             console.log(
-              `[UiMapTileToCard] ✅ Found available collab${i}-container for local`
+              `[UiMapTileToCard] âœ… Found available collab${i}-container for local`
             );
             targetContainer = collabContainer;
             break;
           } else {
             console.log(
-              `[UiMapTileToCard] ❌ collab${i}-container for local is occupied by: ${currentAttendeeId}`
+              `[UiMapTileToCard] âŒ collab${i}-container for local is occupied by: ${currentAttendeeId}`
             );
           }
         }
@@ -4075,13 +4075,13 @@ class chimeHandler {
               currentAttendeeId === attendeeId)
           ) {
             console.log(
-              `[UiMapTileToCard] ✅ Found available collab${i}-container for remote`
+              `[UiMapTileToCard] âœ… Found available collab${i}-container for remote`
             );
             targetContainer = collabContainer;
             break;
           } else {
             console.log(
-              `[UiMapTileToCard] ❌ collab${i}-container for remote is occupied by: ${currentAttendeeId}`
+              `[UiMapTileToCard] âŒ collab${i}-container for remote is occupied by: ${currentAttendeeId}`
             );
           }
         }
@@ -4122,7 +4122,7 @@ class chimeHandler {
     if (statusSpan) statusSpan.textContent = "active";
 
     console.log(
-      `[UiMapTileToCard] ✅ Mapped ${attendeeId} to ${targetContainer.id} (container made visible)`
+      `[UiMapTileToCard] âœ… Mapped ${attendeeId} to ${targetContainer.id} (container made visible)`
     );
     console.log(`[UiMapTileToCard] Container state after mapping:`, {
       id: targetContainer.id,
@@ -4201,7 +4201,7 @@ class chimeHandler {
       this.showHideStatusIcons(targetContainer, attendeeId, true);
     }
 
-    console.log(`[UiMapTileToCard] ✅ All overlays created immediately for ${attendeeId.substring(0,8)}...`);
+    console.log(`[UiMapTileToCard] âœ… All overlays created immediately for ${attendeeId.substring(0,8)}...`);
 
     // Find existing video element for this attendee and move it to target container
     const existingVideo = document.querySelector(
@@ -4211,7 +4211,7 @@ class chimeHandler {
       // Move video to target container
       targetContainer.appendChild(existingVideo);
       console.log(
-        `[UiMapTileToCard] ✅ Moved existing video to ${targetContainer.id}`
+        `[UiMapTileToCard] âœ… Moved existing video to ${targetContainer.id}`
       );
     }
   }
@@ -4910,13 +4910,13 @@ window.addEventListener("DOMContentLoaded", () => {
       // Remove status icons that are in ghost containers (no video sibling)
       const container = icons.closest('[data-attendee-id]');
       if (container && !container.querySelector('video')) {
-        console.log(`[chimeHandler] 🧹 Cleaning up orphaned status icons from ghost container (ID: ${container.id || 'none'})`);
+        console.log(`[chimeHandler] ðŸ§¹ Cleaning up orphaned status icons from ghost container (ID: ${container.id || 'none'})`);
         icons.remove();
         removedCount++;
       }
     });
     if (removedCount > 0) {
-      console.log(`[chimeHandler] ✅ Cleaned up ${removedCount} orphaned status icon containers`);
+      console.log(`[chimeHandler] âœ… Cleaned up ${removedCount} orphaned status icon containers`);
     }
   }, 1000); // Run after page is fully loaded
 
@@ -4935,75 +4935,75 @@ window.addEventListener("DOMContentLoaded", () => {
   // New console function to generate role-based meeting with all participants
   // Simple function to generate meeting links (like curl script)
   window.generateMeetingLinks = async function () {
-    console.log("🚀 Generating meeting links...");
+    console.log("ðŸš€ Generating meeting links...");
 
     try {
       // Step 1: Create Scylla meeting
-      console.log("📋 Step 1: Creating Scylla meeting...");
+      console.log("ðŸ“‹ Step 1: Creating Scylla meeting...");
       const scyllaResponse = await chimeHandler.createScyllaMeeting(
         "meetingID_" + Date.now(),
         "test_host"
       );
       const externalMeetingId = scyllaResponse.externalMeetingId;
-      console.log("✅ Step 1 complete: externalMeetingId =", externalMeetingId);
+      console.log("âœ… Step 1 complete: externalMeetingId =", externalMeetingId);
 
       // Step 2: Create Chime meeting
-      console.log("🏗️ Step 2: Creating Chime meeting...");
+      console.log("ðŸ—ï¸ Step 2: Creating Chime meeting...");
       const chimeResponse = await chimeHandler.createChimeMeeting(
         externalMeetingId
       );
       const meetingId = chimeResponse.meetingId;
       const meetingData = chimeResponse.meetingData;
-      console.log("✅ Step 2 complete: Chime Meeting ID =", meetingId);
+      console.log("âœ… Step 2 complete: Chime Meeting ID =", meetingId);
 
       // Step 3: Add Host
-      console.log("👑 Step 3: Adding host...");
+      console.log("ðŸ‘‘ Step 3: Adding host...");
       const hostResponse = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "host-001",
         "host"
       );
-      console.log("✅ Host added successfully");
+      console.log("âœ… Host added successfully");
 
       // Step 4: Add Collaborator 1
-      console.log("🤝 Step 4: Adding collaborator 1...");
+      console.log("ðŸ¤ Step 4: Adding collaborator 1...");
       const collab1Response = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "collab-001",
         "collaborator"
       );
-      console.log("✅ Collaborator 1 added successfully");
+      console.log("âœ… Collaborator 1 added successfully");
 
       // Step 5: Add Collaborator 2
-      console.log("🤝 Step 5: Adding collaborator 2...");
+      console.log("ðŸ¤ Step 5: Adding collaborator 2...");
       const collab2Response = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "collab-002",
         "collaborator"
       );
-      console.log("✅ Collaborator 2 added successfully");
+      console.log("âœ… Collaborator 2 added successfully");
 
       // Step 6: Add Collaborator 3
-      console.log("🤝 Step 6: Adding collaborator 3...");
+      console.log("ðŸ¤ Step 6: Adding collaborator 3...");
       const collab3Response = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "collab-003",
         "collaborator"
       );
-      console.log("✅ Collaborator 3 added successfully");
+      console.log("âœ… Collaborator 3 added successfully");
 
       // Step 7: Add Attendee
-      console.log("👤 Step 7: Adding attendee...");
+      console.log("ðŸ‘¤ Step 7: Adding attendee...");
       const attendeeResponse = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "attendee-004",
         "guest"
       );
-      console.log("✅ Attendee added successfully");
+      console.log("âœ… Attendee added successfully");
 
       // Generate URLs
       console.log("");
-      console.log("🎯 Meeting URLs for testing:");
+      console.log("ðŸŽ¯ Meeting URLs for testing:");
       console.log("==================================");
       console.log("Scylla Database externalMeetingId:", externalMeetingId);
       console.log("Chime Meeting Service meetingId:", meetingId);
@@ -5055,7 +5055,7 @@ window.addEventListener("DOMContentLoaded", () => {
       console.log("Tab 5 (Attendee):");
       console.log(attendeeUrl);
       console.log("");
-      console.log("📋 Expected behavior (Group Setting - 5 participants):");
+      console.log("ðŸ“‹ Expected behavior (Group Setting - 5 participants):");
       console.log(
         "- Host: Can see all participants in 2x2 grid + mini overlay"
       );
@@ -5066,7 +5066,7 @@ window.addEventListener("DOMContentLoaded", () => {
         "- Attendee: Can see host + collaborators (2x2 grid) + mini overlay"
       );
       console.log("");
-      console.log("📋 Layout will auto-apply based on active participants");
+      console.log("ðŸ“‹ Layout will auto-apply based on active participants");
 
       return {
         success: true,
@@ -5081,59 +5081,59 @@ window.addEventListener("DOMContentLoaded", () => {
         },
       };
     } catch (error) {
-      console.error("❌ Error generating meeting:", error);
+      console.error("âŒ Error generating meeting:", error);
       throw error;
     }
   };
 
   window.generateRoleBasedMeeting = async function () {
-    console.log("🚀 Generating role-based meeting...");
+    console.log("ðŸš€ Generating role-based meeting...");
 
     try {
       // Step 1: Create Scylla meeting
-      console.log("📋 Step 1: Creating Scylla meeting...");
+      console.log("ðŸ“‹ Step 1: Creating Scylla meeting...");
       const scyllaResponse = await chimeHandler.createScyllaMeeting(
         "console-test-" + Date.now(),
         "console-host"
       );
       const externalMeetingId = scyllaResponse.externalMeetingId;
-      console.log("✅ Scylla meeting created:", externalMeetingId);
+      console.log("âœ… Scylla meeting created:", externalMeetingId);
 
       // Step 2: Create Chime meeting
-      console.log("🏗️ Step 2: Creating Chime meeting...");
+      console.log("ðŸ—ï¸ Step 2: Creating Chime meeting...");
       const chimeResponse = await chimeHandler.createChimeMeeting(
         externalMeetingId
       );
       const meetingId = chimeResponse.meetingId;
       const meetingData = chimeResponse.meetingData;
-      console.log("✅ Chime meeting created:", meetingId);
+      console.log("âœ… Chime meeting created:", meetingId);
 
       // Step 3: Add Host
-      console.log("👑 Step 3: Adding host...");
+      console.log("ðŸ‘‘ Step 3: Adding host...");
       const hostResponse = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "host-001",
         "host"
       );
-      console.log("✅ Host added successfully");
+      console.log("âœ… Host added successfully");
 
       // Step 4: Add Collaborator
-      console.log("🤝 Step 4: Adding collaborator...");
+      console.log("ðŸ¤ Step 4: Adding collaborator...");
       const collabResponse = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "collab-002",
         "collaborator"
       );
-      console.log("✅ Collaborator added successfully");
+      console.log("âœ… Collaborator added successfully");
 
       // Step 5: Add Guest
-      console.log("👤 Step 5: Adding guest...");
+      console.log("ðŸ‘¤ Step 5: Adding guest...");
       const guestResponse = await chimeHandler.addAttendeeToMeeting(
         meetingId,
         "guest-003",
         "guest"
       );
-      console.log("✅ Guest added successfully");
+      console.log("âœ… Guest added successfully");
 
       // Decode and combine meetingInfo with full meeting data (like curl script)
       const hostMeetingInfoDecoded = atob(hostResponse.meetingInfo);
@@ -5166,7 +5166,7 @@ window.addEventListener("DOMContentLoaded", () => {
         "?meetingInfo=" +
         encodeURIComponent(btoa(JSON.stringify(guestCombinedInfo)));
 
-      console.log("\n🎯 Meeting URLs for testing:");
+      console.log("\nðŸŽ¯ Meeting URLs for testing:");
       console.log("==================================");
       console.log("Meeting ID:", meetingId);
       console.log("\nTab 1 (Host):");
@@ -5176,7 +5176,7 @@ window.addEventListener("DOMContentLoaded", () => {
       console.log("\nTab 3 (Guest):");
       console.log(guestUrl);
 
-      console.log("\n📋 Expected behavior (Group Setting - 3 participants):");
+      console.log("\nðŸ“‹ Expected behavior (Group Setting - 3 participants):");
       console.log("- Host: Can see hosts and collaborators, NOT attendees");
       console.log(
         "- Collaborator: Can see hosts and collaborators, NOT attendees"
@@ -5195,7 +5195,7 @@ window.addEventListener("DOMContentLoaded", () => {
         guestResponse: guestCombinedInfo,
       };
     } catch (error) {
-      console.error("❌ Error generating meeting:", error);
+      console.error("âŒ Error generating meeting:", error);
       throw error;
     }
   };
@@ -5212,69 +5212,69 @@ window.addEventListener("DOMContentLoaded", () => {
   console.log("- getMeeting(meetingId)");
   console.log("- validateHost(meetingId, userId)");
   console.log(
-    "- generateMeetingLinks() // 🚀 Simple function to generate all 3 meeting links"
+    "- generateMeetingLinks() // ðŸš€ Simple function to generate all 3 meeting links"
   );
   console.log(
-    "- generateRoleBasedMeeting() // 🚀 Creates meeting with host, collaborator, and guest"
+    "- generateRoleBasedMeeting() // ðŸš€ Creates meeting with host, collaborator, and guest"
   );
 
   // Clean CORS test functions
   window.testScyllaDatabaseCORS = async function () {
-    console.log("🧪 Testing Scylla Database API CORS...");
+    console.log("ðŸ§ª Testing Scylla Database API CORS...");
     try {
       const result = await chimeHandler.createScyllaMeeting(
         "cors-test-" + Date.now(),
         "test_host"
       );
-      console.log("✅ Scylla Database API CORS WORKING!", result);
+      console.log("âœ… Scylla Database API CORS WORKING!", result);
       return result;
     } catch (error) {
-      console.log("❌ Scylla Database API CORS BLOCKED:", error.message);
+      console.log("âŒ Scylla Database API CORS BLOCKED:", error.message);
       return null;
     }
   };
 
   window.testChimeMeetingCORS = async function () {
-    console.log("🧪 Testing Chime Meeting API CORS...");
+    console.log("ðŸ§ª Testing Chime Meeting API CORS...");
     try {
       const result = await chimeHandler.createChimeMeeting(
         "cors-test-" + Date.now()
       );
-      console.log("✅ Chime Meeting API CORS WORKING!", result);
+      console.log("âœ… Chime Meeting API CORS WORKING!", result);
       return result;
     } catch (error) {
-      console.log("❌ Chime Meeting API CORS BLOCKED:", error.message);
+      console.log("âŒ Chime Meeting API CORS BLOCKED:", error.message);
       return null;
     }
   };
 
   window.testAllAPIsCORS = async function () {
-    console.log("🧪 Testing ALL APIs CORS...");
+    console.log("ðŸ§ª Testing ALL APIs CORS...");
     const scyllaAPI = await window.testScyllaDatabaseCORS();
     const chimeAPI = await window.testChimeMeetingCORS();
 
-    console.log("📊 CORS Results:");
+    console.log("ðŸ“Š CORS Results:");
     console.log(
       "- Scylla Database API:",
-      scyllaAPI ? "✅ WORKING" : "❌ BLOCKED"
+      scyllaAPI ? "âœ… WORKING" : "âŒ BLOCKED"
     );
-    console.log("- Chime Meeting API:", chimeAPI ? "✅ WORKING" : "❌ BLOCKED");
+    console.log("- Chime Meeting API:", chimeAPI ? "âœ… WORKING" : "âŒ BLOCKED");
 
     return { scyllaAPI: !!scyllaAPI, chimeAPI: !!chimeAPI };
   };
 
-  console.log("- testScyllaDatabaseCORS() // 🧪 Test Scylla Database API CORS");
-  console.log("- testChimeMeetingCORS() // 🧪 Test Chime Meeting API CORS");
-  console.log("- testAllAPIsCORS() // 🧪 Test ALL APIs CORS");
-  console.log("- debugMapping() // 🔍 Debug mapping cache and visibility");
-  console.log("- sendMappingPacket() // 📤 Manually send mapping packet");
+  console.log("- testScyllaDatabaseCORS() // ðŸ§ª Test Scylla Database API CORS");
+  console.log("- testChimeMeetingCORS() // ðŸ§ª Test Chime Meeting API CORS");
+  console.log("- testAllAPIsCORS() // ðŸ§ª Test ALL APIs CORS");
+  console.log("- debugMapping() // ðŸ” Debug mapping cache and visibility");
+  console.log("- sendMappingPacket() // ðŸ“¤ Manually send mapping packet");
   console.log(
-    "- checkVideoTiles() // 🎥 Check all video tiles and their status"
+    "- checkVideoTiles() // ðŸŽ¥ Check all video tiles and their status"
   );
 
   // Debug function to check mapping cache and visibility
   window.debugMapping = function () {
-    console.log("🔍 Debug Mapping Cache:");
+    console.log("ðŸ” Debug Mapping Cache:");
     console.log("Current user role:", chimeHandler._currentUserRole);
     console.log("Mapping cache size:", chimeHandler._mappingCache.size);
     console.log("Mapping cache contents:");
@@ -5284,7 +5284,7 @@ window.addEventListener("DOMContentLoaded", () => {
       );
     }
 
-    console.log("\n🎥 Video Tiles Status:");
+    console.log("\nðŸŽ¥ Video Tiles Status:");
     const allContainers = document.querySelectorAll(".video-card");
     allContainers.forEach((container) => {
       const attendeeId = container.getAttribute("data-attendee-id");
@@ -5297,7 +5297,7 @@ window.addEventListener("DOMContentLoaded", () => {
       );
     });
 
-    console.log("\n👥 Visibility Check:");
+    console.log("\nðŸ‘¥ Visibility Check:");
     const myAttendeeId = coreChime.getLocalIdentifiers().attendeeId;
     for (const [attendeeId, mapping] of chimeHandler._mappingCache.entries()) {
       const shouldShow = chimeHandler._shouldShowVideo(attendeeId);
@@ -5313,15 +5313,15 @@ window.addEventListener("DOMContentLoaded", () => {
     const myExternalUserId = coreChime.getLocalIdentifiers().externalUserId;
     if (myAttendeeId && myExternalUserId) {
       chimeHandler._sendMappingPacket(myAttendeeId, myExternalUserId);
-      console.log("📤 Mapping packet sent manually");
+      console.log("ðŸ“¤ Mapping packet sent manually");
     } else {
-      console.log("❌ Cannot send mapping packet - not connected");
+      console.log("âŒ Cannot send mapping packet - not connected");
     }
   };
 
   // Function to check video tiles
   window.checkVideoTiles = function () {
-    console.log("🎥 Video Tiles Check:");
+    console.log("ðŸŽ¥ Video Tiles Check:");
     const tiles = coreChime.getVideoTiles();
     console.log("Total tiles:", tiles.length);
     tiles.forEach((tile) => {

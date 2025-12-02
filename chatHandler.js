@@ -635,6 +635,7 @@ function renderSubscriptionCard(item) {
   const cardDiv = document.createElement("div");
   cardDiv.className = "mt-2";
 
+
   cardDiv.innerHTML = `
     <div class="px-1 py-1 text-sm font-poppins flex flex-col">
       <div class="flex gap-1 items-center">
@@ -645,10 +646,10 @@ function renderSubscriptionCard(item) {
         </p>
       </div>
       <div class="mt-2">
-        <div class="relative bottom-0 overflow-hidden">
-          <img src="${item.background_image || "https://picsum.photos/seed/s1/1200/800"}" alt="Sunday by the River - watch me catch a 10 kg..." class="w-full h-full opacity-50 object-cover aspect-[344/198.16]" />
+        <div class="relative bottom-0">
+          <img src="${item.background_image || "https://picsum.photos/seed/s1/1200/800"}" alt="Sunday by the River - watch me catch a 10 kg..." class="w-full h-full absolute object-cover  opacity-50" />
           
-          <div style="background: linear-gradient(90deg, rgba(255, 0, 102, 0.1875) 0%, rgba(255, 0, 102, 0.125) 50%, rgba(255, 0, 102, 0) 100%);" class="absolute inset-x-0 aspect-[344/198.16] top-0 border-l-2 border-[#FF0066] h-full  text-white p-4">
+          <div style="background: linear-gradient(90deg, rgba(255, 0, 102, 0.1875) 0%, rgba(255, 0, 102, 0.125) 50%, rgba(255, 0, 102, 0) 100%);" class="inset-x-0 aspect-[344/198.16] top-0 border-l-2 border-[#FF0066] h-full  text-white p-4 min-h-0 sm:min-h-[40.0rem] lg:min-h-0">
             <div class="absolute right-0 top-0 lg:hidden">
               <img class="h-5 w-5" src="assets/sub-svgs/x-close.svg" alt="">
             </div>
@@ -694,7 +695,7 @@ function renderSubscriptionCard(item) {
                   </div>
                 </div>
                 <p class="text-xs font-semibold text-[#FCE40D]">was $123.72</p>
-                <div class="hidden flex-col">
+                <div data-perk-section class="hidden flex-col pb-[3.0rem]">
                   <p class="text-sm text-white font-poppins mt-2 drop-shadow-md">Welcome to Jenny's  VIP Lounge! This plan includes everything in Basic/VIP Lounge, plus: Behind the scene of every shot! stuff i wore from the shot for sale! Talk to me 24/7 ❤️️️ Welcome to Jenny's  VIP Lounge! Welcome to Jenny's  VIP Lounge! </p>
                   <div class="flex flex-col text-white w-full mt-2">
                     <div class="flex mt-1 w-full ">
@@ -729,9 +730,9 @@ function renderSubscriptionCard(item) {
                 </div>
               </div>
               <div class="flex justify-end w-full pl-[1.6rem] left-0 right-0 bottom-0 absolute">
-                <div class="flex w-full items-center gap-2">
+                <div data-toggle-perks class="flex w-full items-center gap-2 relative cursor-pointer">
                   <p class="text-xs font-medium text-[#FF0066]">See Perks</p>
-                  <img src="assets/svgs/chevron-down-double.svg" alt="">
+                  <img data-toggle-perk-image src="https://new-stage.fansocial.app/wp-content/plugins/fansocial/dev/chimenew/assets/svgs/chevron-down-double.svg" alt="">
                 </div>
                 <img src="assets/svgs/Union.svg" alt="">
                 <div style="background: linear-gradient(180deg, #FF0066 0%, #FF492E 100%);" class="h-10 flex items-center justify-center">
@@ -759,6 +760,65 @@ function renderSubscriptionCard(item) {
       }
     });
   }
+
+// Toggle Perks
+const perksContainer = cardDiv.querySelector("[data-perk-section]");
+const toggleWrapper = cardDiv.querySelector("[data-toggle-perks]");
+const toggleText = toggleWrapper?.querySelector("p");
+const chevronIcon = cardDiv.querySelector("[data-toggle-perk-image]");
+
+// find the overlay and the footer row so we can switch them between absolute (collapsed) and static (expanded)
+const overlayGradient = cardDiv.querySelector("div[style*='linear-gradient']");
+const footerRow = toggleWrapper ? toggleWrapper.closest("div") : null;
+
+if (toggleWrapper && perksContainer && toggleText && chevronIcon) {
+  toggleWrapper.style.cursor = "pointer";
+
+  // helper to switch layout when expanding/collapsing
+  function setExpanded(expanded) {
+    if (expanded) {
+      // allow overlay area to grow with content
+      if (overlayGradient) {
+        overlayGradient.classList.remove("aspect-[344/198.16]", "h-full");
+        // overlayGradient.style.minHeight = "auto";
+      }
+      // make footer flow below content instead of absolutely positioned
+      // if (footerRow) {
+      //   footerRow.classList.remove("bottom-0", "left-0", "right-0");
+      //   footerRow.style.position = "relative";
+      // }
+      perksContainer.classList.remove("hidden");
+      perksContainer.style.display = "flex";
+    } else {
+      // restore original collapsed layout
+      if (overlayGradient) {
+        overlayGradient.classList.add("aspect-[344/198.16]", "h-full");
+        overlayGradient.style.minHeight = "";
+      }
+      // if (footerRow) {
+      //   footerRow.classList.add("absolute", "bottom-0", "left-0", "right-0");
+      //   footerRow.style.position = "";
+      // }
+      perksContainer.classList.add("hidden");
+      perksContainer.style.display = "";
+    }
+  }
+
+  toggleWrapper.addEventListener("click", () => {
+    const isHidden = perksContainer.classList.contains("hidden");
+
+    if (isHidden) {
+      toggleText.textContent = "Collapse";
+      chevronIcon.style.transform = "rotate(180deg)";
+      setExpanded(true);
+    } else {
+      toggleText.textContent = "See Perks";
+      chevronIcon.style.transform = "rotate(0deg)";
+      setExpanded(false);
+    }
+  });
+}
+
 
   return cardDiv;
 }

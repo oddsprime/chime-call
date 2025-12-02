@@ -267,7 +267,7 @@
                 class="relative overflow-hidden w-full h-full
                         grid grid-cols-12 grid-rows-2 gap-3"
                 :class="{
-                  'lg:rounded-[0.4rem]': ChimeCallSettings.callChatStatus,
+                  'lg:rounded-[1.0rem]': ChimeCallSettings.callChatStatus,
                   '': !ChimeCallSettings.callChatStatus || isMobile
                 }"
                 data-layout="host_attendee">
@@ -512,13 +512,11 @@
                       <bottom-controls user-initials="UN" :toggle-camera="toggleCamera" :toggle-microphone="toggleMicrophone" 
                         :toggle-chat="toggleChat" :chime-call-settings="ChimeCallSettings" @end-call="onEndCall"></bottom-controls>
 
-                        <transition name="slide">
                           <div v-show="ChimeCallSettings.callChatStatus" 
                               class="absolute right-0 h-full shadow-xl
                                w-full lg:w-[405px] z-50 lg:pt-2 lg:pb-2 lg:pr-2">
                             <chat-sidebar :toggle-chat="toggleChat"></chat-sidebar>
                           </div>
-                        </transition>
                     </div>
                   </section>
                 </div>
